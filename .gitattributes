@@ -1,0 +1,17 @@
+# Normalize all text files to LF in the repository and on checkout.
+# Crypto material (signatures, hashes, canonical JSON) must never depend
+# on platform line endings.
+* text=auto eol=lf
+
+# Windows-specific files keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.wasm binary
+*.pem binary
+*.key binary

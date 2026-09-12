@@ -1,0 +1,42 @@
+name: CI
+
+# Scaffold-stage CI: verifies repository integrity while the monorepo
+# toolchain lands (Phase 1). Each roadmap phase extends this gate list —
+# see docs/roadmap.md#ci-gates for the target set (unit/VC/delegation
+# property tests, opa check, attack suite, container build, ...).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  integrity:
+    name: Repository integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required documents exist
+        run: |
+          test -f README.md
+          test -f LICENSE
+          test -f SECURITY.md
+          test -f CONTRIBUTING.md
+          test -f docs/architecture.md
+          test -f docs/threat-model.md
+          test -f docs/credential-model.md
+          test -f docs/trust-model.md
+          test -f docs/roadmap.md
+
+      - name: Verify monorepo skeleton
+        run: |
+          for d in apps packages policies tests infra docs; do
+            test -d "$d" || { echo "missing $d"; exit 1; }
+          done
+          test "$(find docs/adr -name '*.md' | wc -l)" -ge 3
+
+      - name: Verify no key material staged
+        run: |
+          ! git ls-files | grep -Ei '\.(pem|key|p12|pfx)$'
+          ! git ls-files | grep -E '^\.env'
