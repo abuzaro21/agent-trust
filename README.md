@@ -155,9 +155,24 @@ Build order and week-by-week plan: [docs/roadmap.md](docs/roadmap.md).
 
 ## Development
 
-Prerequisites (planned): Node 22+, pnpm, Docker, PostgreSQL, Redis, and the Open Policy Agent CLI for compiling `policies/` to Wasm.
+Requires Node 22+ (24 recommended). pnpm is provided via corepack:
 
-> The monorepo toolchain lands with the first service (Phase 1 — see roadmap). Until then this repository carries the frozen architecture, threat model, credential contracts, and ADRs. The project's own rule applies: **no UI before cross-agent E2E works** — a single `pnpm demo:e2e` must print that Agent A was accepted or rejected for the right reasons before any dashboard exists.
+```bash
+corepack enable
+pnpm install
+pnpm typecheck   # strict TS across the workspace
+pnpm test        # vitest across all packages
+```
+
+Implemented packages (Phase 1 — contracts, crypto, DID):
+
+| Package | Contents |
+|---|---|
+| `@agent-trust/schemas` | JSON Schema contracts (draft 2020-12), TS types, closed reason-code enum, ajv validator |
+| `@agent-trust/crypto` | Frozen `Signer` interface, ES256 `LocalSigner`, RFC 8785 canonical JSON, DPoP-style proof-of-possession |
+| `@agent-trust/did` | `DidResolver` seam (ADR-0001), `did:key` P-256, `did:web` with timeout/injectable fetch, method registry |
+
+The project's own rule applies: **no UI before cross-agent E2E works** — a single `pnpm demo:e2e` must print that Agent A was accepted or rejected for the right reasons before any dashboard exists.
 
 ## Documentation
 

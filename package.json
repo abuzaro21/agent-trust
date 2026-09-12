@@ -1,0 +1,19 @@
+{
+  "name": "agent-trust",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Trust & Authorization Fabric for AI agents — monorepo root",
+  "packageManager": "pnpm@11.1.1",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo:e2e": "echo \"demo:e2e lands with the cross-agent E2E phase — see docs/roadmap.md build order step 10\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
