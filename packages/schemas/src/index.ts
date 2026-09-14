@@ -35,3 +35,7 @@ export {
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
   delegationCredentialClaimsSchema,
 } from './schemas/delegation-credential.schema.js';
+export {
+  SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
+  membershipCredentialClaimsSchema,
+} from './schemas/membership-credential-claims.schema.js';

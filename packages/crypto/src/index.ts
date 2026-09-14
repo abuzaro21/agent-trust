@@ -14,6 +14,8 @@ export {
   utf8,
 } from './helpers.js';
 export { verifyEs256 } from './verify.js';
+export { ecdsaDerToRaw, ecdsaRawToDer } from './ecdsa-sig.js';
+export { withDid } from './signer-with-did.js';
 export {
   type ProofBinding,
   type ProofFailure,

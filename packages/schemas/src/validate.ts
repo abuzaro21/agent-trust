@@ -37,6 +37,10 @@ import {
   delegationCredentialClaimsSchema,
 } from './schemas/delegation-credential.schema.js';
 import {
+  SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
+  membershipCredentialClaimsSchema,
+} from './schemas/membership-credential-claims.schema.js';
+import {
   SCHEMA_ID_DID_DOCUMENT,
   didDocumentSchema,
 } from './schemas/did-document.schema.js';
@@ -62,6 +66,7 @@ export const ALL_SCHEMAS = [
   actionReceiptSchema,
   didDocumentSchema,
   delegationCredentialClaimsSchema,
+  membershipCredentialClaimsSchema,
 ] as const;
 
 export const SCHEMA_IDS = [
@@ -73,6 +78,7 @@ export const SCHEMA_IDS = [
   SCHEMA_ID_ACTION_RECEIPT,
   SCHEMA_ID_DID_DOCUMENT,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
+  SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
 ] as const;
 
 export interface ValidationOutcome {

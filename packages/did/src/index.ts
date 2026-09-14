@@ -19,4 +19,6 @@ export {
 
 export { DidWebResolver, didWebToUrl } from './did-web.js';
 
+export { InMemoryDidResolver, didDocumentForJwk } from './in-memory.js';
+
 export { MultiDidResolver } from './registry.js';

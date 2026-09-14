@@ -39,6 +39,8 @@ export const authoritySchema: JsonSchema = {
       },
     },
     delegationDepth: { type: 'integer', minimum: 0 },
+    validFrom: { type: 'string', format: 'date-time' },
+    validUntil: { type: 'string', format: 'date-time' },
   },
   $defs: {
     did: { type: 'string', pattern: '^did:[a-z0-9]+:.+' },

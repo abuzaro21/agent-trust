@@ -6,6 +6,7 @@ import {
   SCHEMA_ID_AUTHORITY,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
   SCHEMA_ID_DID_DOCUMENT,
+  SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
   SCHEMA_ID_POLICY_DECISION,
   SCHEMA_ID_POLICY_INPUT,
   SCHEMA_ID_TRUST_EVALUATE_REQUEST,
@@ -251,6 +252,64 @@ describe('delegation-credential-claims schema', () => {
       v.validate(SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS, {
         ...valid,
         vc: { ...valid.vc, type: ['VerifiableCredential'] },
+      }).valid,
+    ).toBe(false);
+  });
+
+  it('accepts authority-level validFrom/validUntil time windows', () => {
+    expect(
+      v.validate(SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS, {
+        ...valid,
+        vc: {
+          ...valid.vc,
+          credentialSubject: {
+            ...valid.vc.credentialSubject,
+            authority: {
+              ...valid.vc.credentialSubject.authority,
+              validFrom: '2026-09-13T00:00:00Z',
+              validUntil: '2026-10-13T00:00:00Z',
+            },
+          },
+        },
+      }).valid,
+    ).toBe(true);
+  });
+});
+
+describe('membership-credential-claims schema', () => {
+  const validMembership = {
+    iss: 'did:web:acme.example:org',
+    sub: 'did:web:agents.acme.example:refund-bot',
+    jti: 'vc-membership-001',
+    nbf: 1757800000,
+    vc: {
+      type: ['VerifiableCredential', 'AgentMembershipCredential'],
+      credentialSubject: {
+        id: 'did:web:agents.acme.example:refund-bot',
+        controller: 'did:web:acme.example:org',
+        organization: 'Acme Retail',
+        runtimeBinding: 'spiffe://acme.prod/agents/refund-01',
+      },
+    },
+  };
+
+  it('accepts canonical membership claims', () => {
+    expect(
+      v.validate(SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS, validMembership).valid,
+    ).toBe(true);
+  });
+
+  it('rejects a non-DID subject and the wrong credential type marker', () => {
+    expect(
+      v.validate(SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS, {
+        ...validMembership,
+        sub: 'not-a-did',
+      }).valid,
+    ).toBe(false);
+    expect(
+      v.validate(SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS, {
+        ...validMembership,
+        vc: { ...validMembership.vc, type: ['VerifiableCredential', 'AgentDelegationCredential'] },
       }).valid,
     ).toBe(false);
   });

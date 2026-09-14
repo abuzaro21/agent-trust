@@ -29,6 +29,13 @@ export interface Authority {
   audience?: Did[];
   limits?: AuthorityLimits;
   /**
+   * Optional authority-scoped time window (ISO-8601 UTC strings), checked
+   * by the delegation attenuator in addition to the credential's own
+   * validFrom/validUntil. A child window may never exceed its parent's.
+   */
+  validFrom?: string;
+  validUntil?: string;
+  /**
    * Remaining sub-delegation budget. 0 = leaf agent, cannot delegate further.
    * child.depth < parent.remainingDepth is enforced structurally.
    */
