@@ -18,6 +18,9 @@ policyManifest.json
 # committed artifacts/policy/ is NOT here — only the volatile reports).
 artifacts/attacks/
 
+# Next.js build output
+.next/
+
 # Environment & secrets — never commit key material
 .env
 .env.*

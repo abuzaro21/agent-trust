@@ -1,0 +1,33 @@
+{
+  "name": "@agent-trust/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "@agent-trust/attacks": "workspace:*",
+    "@agent-trust/audit": "workspace:*",
+    "@agent-trust/crypto": "workspace:*",
+    "@agent-trust/delegation": "workspace:*",
+    "@agent-trust/did": "workspace:*",
+    "@agent-trust/gateway": "workspace:*",
+    "@agent-trust/policy": "workspace:*",
+    "@agent-trust/replay": "workspace:*",
+    "@agent-trust/schemas": "workspace:*",
+    "@agent-trust/status": "workspace:*",
+    "@agent-trust/trust-profile": "workspace:*",
+    "@agent-trust/vc": "workspace:*",
+    "next": "^15.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

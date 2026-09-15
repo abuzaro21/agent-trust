@@ -1,0 +1,148 @@
+/* Step 14 — design tokens (primitive → semantic, dark technical theme).
+   Serious security-infrastructure character: dark neutral surfaces,
+   high contrast, subtle borders, monospace accents, color+text status. */
+
+:root {
+  /* primitives */
+  --slate-950: #020617;
+  --slate-900: #0f172a;
+  --slate-800: #1e293b;
+  --slate-700: #334155;
+  --slate-500: #64748b;
+  --slate-300: #cbd5e1;
+  --slate-100: #f1f5f9;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+  --amber-500: #f59e0b;
+  --blue-400: #60a5fa;
+
+  /* semantic surfaces */
+  --bg: var(--slate-950);
+  --surface: var(--slate-900);
+  --surface-raised: #131c31;
+  --border: var(--slate-800);
+  --border-strong: var(--slate-700);
+
+  /* semantic text */
+  --fg: var(--slate-100);
+  --fg-muted: var(--slate-300);
+  --fg-subtle: var(--slate-500);
+
+  /* status (always paired with text/icons — never color-only) */
+  --ok: var(--green-500);
+  --ok-bg: rgba(34, 197, 94, 0.12);
+  --deny: var(--red-500);
+  --deny-bg: rgba(239, 68, 68, 0.12);
+  --warn: var(--amber-500);
+  --warn-bg: rgba(245, 158, 11, 0.12);
+  --neutral: var(--slate-500);
+  --neutral-bg: rgba(100, 116, 139, 0.14);
+  --info: var(--blue-400);
+
+  /* typography */
+  --font-sans: 'Fira Sans', system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, monospace;
+
+  /* rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: var(--info);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.label {
+  font-size: 0.78rem;
+  color: var(--fg-subtle);
+  margin-bottom: var(--space-1);
+}
+
+.value {
+  font-size: 0.95rem;
+  color: var(--fg);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: 999px;
+  padding: 1px var(--space-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.badge--ok { color: var(--ok); background: var(--ok-bg); border-color: rgba(34, 197, 94, 0.35); }
+.badge--deny { color: var(--deny); background: var(--deny-bg); border-color: rgba(239, 68, 68, 0.35); }
+.badge--warn { color: var(--warn); background: var(--warn-bg); border-color: rgba(245, 158, 11, 0.35); }
+.badge--neutral { color: var(--fg-muted); background: var(--neutral-bg); border-color: var(--border-strong); }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

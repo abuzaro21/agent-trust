@@ -83,6 +83,11 @@ jobs:
         env:
           OPA_BIN: /usr/local/bin/opa
 
+      - name: Web dashboard tests + production build
+        run: |
+          pnpm test:frontend
+          pnpm build:web
+
       - name: Adversarial attack suite (deterministic, no public network)
         run: pnpm test:attacks
         env:
