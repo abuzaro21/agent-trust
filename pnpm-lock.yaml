@@ -8,6 +8,30 @@ importers:
 
   .:
     devDependencies:
+      '@agent-trust/audit':
+        specifier: workspace:*
+        version: link:packages/audit
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:packages/crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:packages/did
+      '@agent-trust/gateway':
+        specifier: workspace:*
+        version: link:packages/gateway
+      '@agent-trust/policy':
+        specifier: workspace:*
+        version: link:packages/policy
+      '@agent-trust/replay':
+        specifier: workspace:*
+        version: link:packages/replay
+      '@agent-trust/status':
+        specifier: workspace:*
+        version: link:packages/status
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:packages/vc
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.4

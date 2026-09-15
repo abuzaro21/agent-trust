@@ -17,7 +17,32 @@ export {
   publicKeyJwkFromDidKey,
 } from './did-key.js';
 
-export { DidWebResolver, didWebToUrl } from './did-web.js';
+export {
+  WebDidResolver,
+  didWebToUrl,
+  parseDidWebIdentifier,
+  validateDidWebDocument,
+  validatePublicJwk,
+  cacheMaxAgeSeconds,
+  type DidWebCacheEntry,
+  type DidWebResolverOptions,
+  type ResolveOptions,
+} from './did-web.js';
+
+export {
+  DidWebTransportError,
+  NodeHttpsDidWebClient,
+  assertDestinationAllowed,
+  classifyAddress,
+  parseIpv6,
+  type AddressVerdict,
+  type DidWebDnsLookup,
+  type DidWebFetchOptions,
+  type DidWebHttpClient,
+  type DidWebHttpResponse,
+  type DidWebNetworkPolicy,
+  type NodeHttpsClientOptions,
+} from './did-web-transport.js';
 
 export { InMemoryDidResolver, didDocumentForJwk } from './in-memory.js';
 

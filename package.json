@@ -16,9 +16,20 @@
     "setup:opa": "node scripts/setup-opa.mjs",
     "build:policy": "node scripts/build-policy.mjs",
     "demo:e2e": "tsx packages/gateway/scripts/demo-e2e.mjs",
-    "demo:profile": "tsx packages/trust-profile/scripts/demo-profile.mjs"
+    "demo:profile": "tsx packages/trust-profile/scripts/demo-profile.mjs",
+    "demo:did:init": "tsx scripts/demo-did-init.mjs",
+    "demo:did:resolve": "tsx scripts/demo-did-resolve.mjs",
+    "demo:e2e:web": "tsx scripts/demo-e2e-web.mjs"
   },
   "devDependencies": {
+    "@agent-trust/audit": "workspace:*",
+    "@agent-trust/crypto": "workspace:*",
+    "@agent-trust/did": "workspace:*",
+    "@agent-trust/gateway": "workspace:*",
+    "@agent-trust/policy": "workspace:*",
+    "@agent-trust/replay": "workspace:*",
+    "@agent-trust/status": "workspace:*",
+    "@agent-trust/vc": "workspace:*",
     "@types/node": "^24.0.0",
     "fast-check": "^4.10.0",
     "tsx": "^4.23.13",

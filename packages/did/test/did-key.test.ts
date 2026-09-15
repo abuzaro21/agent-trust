@@ -72,8 +72,8 @@ describe('DidKeyResolver', () => {
 
 describe('MultiDidResolver', () => {
   it('answers methodUnsupported for unregistered methods', async () => {
-    const { DidWebResolver } = await import('../src/index.js');
-    const multi = new MultiDidResolver([new DidWebResolver()]);
+    const { WebDidResolver } = await import('../src/index.js');
+    const multi = new MultiDidResolver([new WebDidResolver()]);
     const result = await multi.resolve('did:key:zSomething');
     expect(result.didDocument).toBeNull();
     expect(result.didResolutionMetadata.error).toBe('methodUnsupported');

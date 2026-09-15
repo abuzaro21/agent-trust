@@ -25,6 +25,10 @@ policyManifest.json
 keys/
 secrets/
 
+# Local demo identity material (private keys + generated DID docs).
+# demo:did:init writes here; nothing under it may ever be committed.
+.local/
+
 # Databases & runtime state
 *.sqlite
 *.db

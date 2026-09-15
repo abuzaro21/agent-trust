@@ -172,6 +172,9 @@ TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
 
 pnpm demo:e2e           # cross-agent gateway demonstration (all real components)
 pnpm demo:profile       # evidence-based Trust Profiles — attestations, history, integrity
+pnpm demo:did:init      # one-time live identity setup → did:web docs + gitignored local keys
+pnpm demo:did:resolve did:web:example.com:agents:support   # real HTTPS resolution + diagnostics
+DEMO_DID_DOMAIN=example.com pnpm demo:e2e:web              # live did:web mode (deployment-gated)
 
 # Policy pipeline (requires the pinned OPA v1.20.2 on PATH, or tools/bin):
 pnpm policy:fmt && pnpm policy:check && pnpm policy:test
@@ -184,7 +187,7 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 |---|---|
 | `@agent-trust/schemas` | JSON Schema contracts (draft 2020-12), TS types, closed reason-code enum, ajv validator |
 | `@agent-trust/crypto` | Frozen `Signer` interface, ES256 `LocalSigner`, RFC 8785 canonical JSON, DPoP-style proof-of-possession |
-| `@agent-trust/did` | `DidResolver` seam (ADR-0001), `did:key` P-256, `did:web` with timeout/injectable fetch, method registry |
+| `@agent-trust/did` | `DidResolver` seam (ADR-0001), `did:key` P-256, production `did:web` resolver (ADR-0004): strict parser, HTTPS-only SSRF-pinned transport, exact document-id binding, P-256 key profile, bounded cache with rotation-aware freshness, method registry |
 | `@agent-trust/vc` | Compact-JWS W3C VC 2.0 issuance/verification — 11-stage pipeline. Quarantine kill switch on verified identities. |
 | `@agent-trust/delegation` | `Authority(child) ⊆ Authority(parent)` attenuator + chain walker with cycle detection, property-tested |
 | `@agent-trust/status` | W3C Bitstring Status List (revocation permanent, suspension reversible), signed status-list credentials, agent quarantine — fail-closed |
@@ -232,7 +235,7 @@ The project's own rule applies: **no UI before cross-agent E2E works** — a sin
 - [Credential model](docs/credential-model.md) — VC types, delegation attenuation rules
 - [Trust model](docs/trust-model.md) — trust profiles, reputation-as-evidence, decision objects
 - [Roadmap](docs/roadmap.md) — phases, build order, definition of done
-- [ADRs](docs/adr/) — frozen architecture decisions
+- [ADRs](docs/adr/) — frozen architecture decisions ([ADR-0004: did:web live identity plane](docs/adr/0004-did-web-live-identity.md))
 - [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## License

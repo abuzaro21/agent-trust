@@ -1,5 +1,6 @@
 import {
   type KeyObject,
+  createPrivateKey,
   generateKeyPairSync,
   sign as nodeSign,
 } from 'node:crypto';
@@ -42,6 +43,34 @@ export class LocalSigner implements Signer {
     const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
     const jwk = publicKey.export({ format: 'jwk' }) as PublicJwk;
     return new LocalSigner(privateKey, jwk, opts.did);
+  }
+
+  /**
+   * Re-import a previously generated ES256 private key from its JWK.
+   * Used ONLY by local/demo tooling that persists a stable identity across
+   * runs (Step 12Z) — the key must come from a gitignored local directory
+   * or an environment secret; nothing in the trust pipeline ever exports
+   * private material. Validates that the pair actually is P-256.
+   */
+  static fromPrivateJwk(jwk: PublicJwk & { d: string; [k: string]: unknown }, opts: { did?: string } = {}): LocalSigner {
+    if (jwk.kty !== 'EC' || jwk.crv !== 'P-256' || typeof jwk.d !== 'string') {
+      throw new TypeError('expected an EC P-256 private JWK with d');
+    }
+    const privateKey = createPrivateKey({ key: jwk as never, format: 'jwk' });
+    const pub = privateKey.export({ format: 'jwk' }) as PublicJwk & { d?: string };
+    if (pub.kty !== 'EC' || pub.crv !== 'P-256') throw new TypeError('imported key is not P-256');
+    const publicJwk: PublicJwk = { kty: 'EC', crv: 'P-256', x: pub.x, y: pub.y };
+    return new LocalSigner(privateKey, publicJwk, opts.did);
+  }
+
+  /**
+   * Export the private JWK for LOCAL-ONLY persistence (gitignored demo
+   * keys, Step 12Y). Production signing must use a Signer implementation
+   * that never exports material; this method exists so `demo:did:init`
+   * can persist a STABLE local identity across runs.
+   */
+  exportPrivateJwk(): PublicJwk & { d: string } {
+    return this.#privateKey.export({ format: 'jwk' }) as PublicJwk & { d: string };
   }
 
   async keyId(): Promise<string> {
