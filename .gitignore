@@ -7,7 +7,11 @@ dist/
 build/
 out/
 *.tsbuildinfo
+# Un-committed policy builds. The release artifact at
+# artifacts/policy/policy.wasm IS committed and hash-pinned by its
+# manifest (scripts/build-policy.mjs).
 policy.wasm
+!artifacts/policy/policy.wasm
 policyManifest.json
 
 # Environment & secrets — never commit key material
