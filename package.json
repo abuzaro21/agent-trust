@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Trust & Authorization Fabric for AI agents — monorepo root",
+  "description": "Trust & Authorization Fabric for AI agents \u2014 monorepo root",
   "packageManager": "pnpm@11.1.1",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -24,7 +24,9 @@
     "demo:did:resolve": "tsx scripts/demo-did-resolve.mjs",
     "demo:e2e:web": "tsx scripts/demo-e2e-web.mjs",
     "demo:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs",
-    "test:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs --ci"
+    "test:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs --ci",
+    "smoke:live": "node scripts/smoke-live.mjs",
+    "shots:live": "node scripts/shots-live.mjs"
   },
   "devDependencies": {
     "@agent-trust/audit": "workspace:*",
@@ -37,8 +39,11 @@
     "@agent-trust/vc": "workspace:*",
     "@types/node": "^24.0.0",
     "fast-check": "^4.10.0",
+    "puppeteer-core": "^25.11.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "@agent-trust/attacks": "workspace:*",
+    "@agent-trust/trust-profile": "workspace:*"
   }
 }

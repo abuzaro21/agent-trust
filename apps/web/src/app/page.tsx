@@ -18,6 +18,14 @@ const PRESETS: { id: string; label: string; tone: 'ok' | 'deny' | 'warn'; hint: 
 
 const SPOOFED_DID = 'did:web:evil.example:agent';
 
+interface DemoStatus {
+  identityMode: 'fixture' | 'web';
+  dids: { org: string; support: string; refund: string };
+  replayStore: 'redis' | 'in-memory';
+  build?: { sha?: string };
+  environment?: string;
+}
+
 export default function Dashboard() {
   const [profile, setProfile] = useState<ProfileDto | null>(null);
   const [audit, setAudit] = useState<AuditDto | null>(null);
@@ -26,18 +34,30 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState('120');
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [status, setStatus] = useState<DemoStatus | null>(null);
   const pipelineRef = useRef<HTMLDivElement>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (attempt = 0): Promise<void> => {
     try {
-      const [p, a] = await Promise.all([
-        fetch('/api/agents/support/profile').then((r) => r.json()),
-        fetch('/api/audit/acme-demo').then((r) => r.json()),
+      const [pr, ar, s] = await Promise.all([
+        fetch('/api/agents/support/profile'),
+        fetch('/api/audit/acme-demo'),
+        fetch('/api/demo/status').then((r) => (r.ok ? r.json() : null)),
       ]);
-      setProfile(p);
-      setAudit(a);
+      if (!pr.ok || !ar.ok) throw new Error('backend initializing');
+      setProfile(await pr.json());
+      setAudit(await ar.json());
+      if (s?.dids !== undefined) setStatus(s as DemoStatus);
+      setError(null);
     } catch {
-      setError('Dashboard backend unavailable.');
+      // STEP 16AJ — cold start on sleeping hosts: the first request can
+      // outlive the initial render. Retry with backoff; the honest
+      // "Initializing" state stays visible meanwhile (never fake data).
+      if (attempt < 6) {
+        setTimeout(() => void refresh(attempt + 1), 800 + attempt * 700);
+      } else {
+        setError('Dashboard backend unavailable.');
+      }
     }
   }, []);
 
@@ -88,7 +108,7 @@ export default function Dashboard() {
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 24px 64px' }}>
-      <Header />
+      <Header status={status} />
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,7fr)', gap: 16, marginTop: 24 }}>
         <div style={{ display: 'grid', gap: 16, alignContent: 'start' }}>
@@ -149,7 +169,7 @@ export default function Dashboard() {
   );
 }
 
-function Header() {
+function Header({ status }: { status: DemoStatus | null }) {
   return (
     <header>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
@@ -159,11 +179,25 @@ function Header() {
             Verifiable identity. Scoped authority. Explainable decisions.
           </p>
         </div>
-        <nav style={{ display: 'flex', gap: 12 }}>
+        <nav style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="badge badge--neutral" title={status?.environment ?? 'demo environment'}>
+            Challenge Demo · simulation, not a payment system
+          </span>
           <a href="/attacks" className="badge badge--neutral" style={{ textDecoration: 'none' }}>
             Security Tests →
           </a>
         </nav>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <span className={`badge ${status?.identityMode === 'web' ? 'badge--ok' : 'badge--neutral'}`}>
+          Identity: {status?.identityMode === 'web' ? '✓ did:web (live HTTPS)' : 'did:web fixtures'}
+        </span>
+        <span className={`badge ${status?.replayStore === 'redis' ? 'badge--ok' : 'badge--neutral'}`}>
+          Replay: {status?.replayStore === 'redis' ? '✓ Redis-backed' : 'in-memory (dev)'}
+        </span>
+        {status?.build?.sha !== undefined && status.build.sha !== 'dev' && (
+          <span className="badge badge--neutral">build {status.build.sha.slice(0, 7)}</span>
+        )}
       </div>
       <p className="mono" style={{ marginTop: 12, color: 'var(--fg-subtle)', fontSize: '.78rem' }}>
         Trust is evaluated from verifiable evidence and context — there is no universal trust score, and none is computed here.
@@ -601,6 +635,9 @@ function SkeletonCard({ title }: { title: string }) {
     <div className="card" aria-busy="true">
       <h2>{title}</h2>
       <div style={{ height: 40, background: 'var(--neutral-bg)', borderRadius: 6 }} />
+      <div className="mono" style={{ marginTop: 8, color: 'var(--fg-subtle)', fontSize: '.78rem' }}>
+        Initializing secure demo…
+      </div>
     </div>
   );
 }

@@ -1,0 +1,9 @@
+# STEP 16 — public live-identity rehearsal: dashboard in DEMO_IDENTITY_MODE=web
+# (real did:web identities on a public HTTPS host) + Redis-backed replay.
+#   docker compose -f docker-compose.demo.yml -f docker-compose.live.yml up --build
+# The identity key secrets are provided via an env file (deployment secrets —
+# NEVER committed):  --env-file .local/live.compose.env
+services:
+  web:
+    env_file:
+      - .local/live.compose.env

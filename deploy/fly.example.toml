@@ -1,0 +1,50 @@
+# STEP 16Y — deployment manifest template (Fly.io; any Docker-capable
+# single-replica host works the same way). Copy to the repo root as
+# fly.toml, then:
+#   fly launch
+#   fly redis create
+#   fly secrets set DEMO_REDIS_URL=... DEMO_ORG_KEY_JSON=... \
+#     DEMO_SUPPORT_KEY_JSON=... DEMO_REFUND_KEY_JSON=...
+#   fly deploy
+#
+# Secrets (private keys, Redis credentials) are set via `fly secrets set` —
+# they NEVER enter Git, the image, or the browser.
+
+app = "agent-trust-demo"
+primary_region = "fra"
+
+[build]
+  dockerfile = "apps/web/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  AGENT_TRUST_REPO_ROOT = "/app"
+  DEMO_IDENTITY_MODE = "web"
+  # DEMO_DID_DOMAIN must be the host serving the published did.json files —
+  # either this app's own public hostname (it then serves them itself at
+  # /agents/<name>/did.json) or an external HTTPS identity host such as
+  # GitHub Pages (e.g. abuzaro21.github.io).
+  DEMO_DID_DOMAIN = "REPLACE_ME"
+
+# P0 requires exactly ONE app replica: audit/demo/profile state is
+# process-local (rebuilt deterministically at startup); only replay state
+# is external (Redis). Horizontal scaling is deliberately pinned — do not
+# raise max_machines while authoritative demo state is process-local.
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

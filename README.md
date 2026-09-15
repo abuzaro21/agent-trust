@@ -4,7 +4,51 @@
 
 > **Trust is not a score. It is verifiable, scoped, revocable authority.**
 
----
+## Live Demo
+
+> The interactive demo (real `did:web` identities + Redis-backed replay + the
+> full gateway) runs from one command — see Quickstart below. A public hosted
+> URL is pending a hosting-provider account; everything needed to deploy it is
+> committed and pre-verified with the live smoke suite (45/45) against the
+> public identities. The demo UI is shown below exactly as the deployed
+> rehearsal renders it.
+
+**Same legitimate agent. Same identity. Same verified credential.**
+
+| | Request | Result |
+|---|---|---|
+| | refund **120 SAR** | **ALLOW** → executed → audit receipt |
+| | refund **5000 SAR** | **DENY** `AUTHORITY_LIMIT_EXCEEDED` — exceeds the delegated cap of 500 SAR |
+| | spoofed identity | **DENY** `IDENTITY_PROOF_INVALID` — signed with a foreign key |
+| | revoked credential | **DENY** `CREDENTIAL_REVOKED` — current status kills authority |
+| | replayed bytes | **DENY** `REPLAY_DETECTED` — one authorization, one execution |
+
+The second row is the thesis: the agent was not "less trusted" — the *action*
+left the scope of its authority. Deterministic policy, not reputation, decides.
+
+**60/60 adversarial security scenarios pass** at image build time (see the
+[Security Tests view](docs/screenshots/05-security-tests.png)): identity
+spoofing, tampered proofs, audience confusion, delegation widening, revocation
+bypass, replay, provider outages, DID-transport abuse — each judged not only on
+the denial reason but on side-effect invariants (the executor really did not
+run; the victim really was not attributed).
+
+| | |
+|---|---|
+| ![Trust Profile — live did:web identity, scoped authority](docs/screenshots/01-trust-profile.png) | Trust Profile: what VERIFIED evidence exists for this agent — identity, authority, attestations, history. **No scores anywhere.** |
+| ![120 SAR authorized](docs/screenshots/02-allow-120.png) ![5000 SAR denied](docs/screenshots/03-deny-5000.png) | The pipeline view is rendered from the backend `GatewayResult.stages` — the browser never decides anything. |
+
+**Architecture in one line:** Identity → Claims → Verification → Authority → Policy → Provenance (full diagram in [docs/architecture.md](docs/architecture.md)).
+
+### Quickstart
+
+```bash
+git clone https://github.com/abuzaro21/agent-trust
+cd agent-trust
+docker compose -f docker-compose.demo.yml up --build
+# → http://localhost:3000   (Redis-backed replay; no OPA install needed —
+#   the policy engine runs from the committed, hash-pinned Wasm artifact)
+```
 
 ## The Problem
 
@@ -227,18 +271,27 @@ docker compose -f docker-compose.demo.yml up --build
 
 Then open http://localhost:3000 (dashboard) and http://localhost:3000/attacks (suite
 view). `GET /api/demo/status` reports which replay backend is live (`redis` vs
-`in-memory`) and what the other simulation seams are.
+`in-memory`), the identity mode (`web` vs `fixture`), the live DIDs, and the
+build SHA. `GET /api/health` is the lightweight platform health check.
 
-Environment knobs:
+**Live identity mode (public deployment)** adds real `did:web` identities:
+org/support/refund resolve over public HTTPS via the hardened Step 12 resolver
+(host allowlist, pinned DNS, exact-document binding, bounded cache; startup
+fails if resolution or Redis fail — no silent fallbacks). The full operational
+contract — environment variables, secret custody, state/restart model,
+single-replica requirement, public identities hosted at
+`did:web:abuzaro21.github.io:agents:{org,support,refund}`, provider blocker —
+is in **[docs/deployment.md](docs/deployment.md)**. After any configuration
+change, verify with the outside-in regression gate:
 
-| Variable | Effect |
-|---|---|
-| `DEMO_REDIS_URL` | e.g. `redis://redis:6379` — switches the replay store to real Redis `SET NX PX`; on connection failure the gateway fails CLOSED (no silent fallback to in-memory). |
-| `AGENT_TRUST_REPO_ROOT` | Where the server finds `artifacts/policy/policy.wasm` (+ `artifacts/attacks/`). The image sets `/app`; set this for any other host layout. |
-| `PORT` / `HOSTNAME` | Next standalone server bind (default `3000` / `0.0.0.0`). |
+```bash
+DEMO_PUBLIC_URL=https://<host> pnpm smoke:live   # 45 checks: public DIDs,
+                                                  # judge scenarios, leak scans
+```
 
-No private keys, signer material, or Redis credentials ever leave the server process:
-the browser receives sanitized DTOs only, and the response-shape tests enforce that.
+No private keys, signer material, or Redis credentials ever leave the server
+process: the browser receives sanitized DTOs only, response-shape tests
+enforce that, and `smoke:live` re-scans the deployed API + HTML + JS bundles.
 
 ## Architecture: the authorized path
 
