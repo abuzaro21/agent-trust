@@ -144,9 +144,9 @@ export const POLICY_002: AttackScenario = {
   async run() {
     const { mkdtemp, writeFile, copyFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
-    const { join, dirname } = await import('node:path');
-    const { fileURLToPath } = await import('node:url');
-    const wasmSrc = join(dirname(fileURLToPath(import.meta.url)), '../../../artifacts/policy/policy.wasm');
+    const { join } = await import('node:path');
+    const { ATTACK_WASM_PATH } = await import('./world.js');
+    const wasmSrc = ATTACK_WASM_PATH;
     const dir = await mkdtemp(join(tmpdir(), 'atk-policy-'));
     await copyFile(wasmSrc, join(dir, 'policy.wasm'));
     // Tampered manifest: valid JSON, WRONG sha256.

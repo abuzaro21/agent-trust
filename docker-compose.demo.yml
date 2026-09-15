@@ -1,0 +1,26 @@
+# Demo deployment: dashboard + real Redis-backed atomic replay protection.
+#   docker compose -f docker-compose.demo.yml up --build
+# Open http://localhost:3000 — GET /api/demo/status reports replayStore=redis.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      DEMO_REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy

@@ -206,6 +206,40 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 | `@agent-trust/attacks` | **Adversarial suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each judges the denial reason AND the side-effect invariants (executor calls, victim attribution, cache state, profile immutability); machine-readable `artifacts/attacks/attack-report.{json,md}` |
 
 | `apps/web` | **Demo dashboard** (Next.js, `pnpm dev`) — trust console (profile, presets, pipeline, decision, audit, evidence) + `/attacks` suite view. A pure read model: every decision comes from the real gateway server-side; no trust logic or scores in the browser. |
+
+## Deployment (demo)
+
+The dashboard ships as a self-contained multi-stage image. Everything it needs to make
+REAL decisions — the hash-pinned OPA policy artifact and the deterministic 60-scenario
+attack report — is baked in at build time; the container runs the same gateway pipeline
+the tests cover.
+
+```bash
+# Build from the repository root (Dockerfile lives in apps/web):
+docker build -t agent-trust-demo -f apps/web/Dockerfile .
+
+# Run with the in-memory demo replay store:
+docker run -p 3000:3000 agent-trust-demo
+
+# Run with Redis-backed atomic replay protection (recommended demo mode):
+docker compose -f docker-compose.demo.yml up --build
+```
+
+Then open http://localhost:3000 (dashboard) and http://localhost:3000/attacks (suite
+view). `GET /api/demo/status` reports which replay backend is live (`redis` vs
+`in-memory`) and what the other simulation seams are.
+
+Environment knobs:
+
+| Variable | Effect |
+|---|---|
+| `DEMO_REDIS_URL` | e.g. `redis://redis:6379` — switches the replay store to real Redis `SET NX PX`; on connection failure the gateway fails CLOSED (no silent fallback to in-memory). |
+| `AGENT_TRUST_REPO_ROOT` | Where the server finds `artifacts/policy/policy.wasm` (+ `artifacts/attacks/`). The image sets `/app`; set this for any other host layout. |
+| `PORT` / `HOSTNAME` | Next standalone server bind (default `3000` / `0.0.0.0`). |
+
+No private keys, signer material, or Redis credentials ever leave the server process:
+the browser receives sanitized DTOs only, and the response-shape tests enforce that.
+
 ## Architecture: the authorized path
 
 ```text

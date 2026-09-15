@@ -95,6 +95,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.3.0(react@19.3.0)
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1
     devDependencies:
       '@types/node':
         specifier: ^24.0.0

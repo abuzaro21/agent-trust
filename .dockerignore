@@ -1,0 +1,8 @@
+**/node_modules
+**/.next
+.git
+.local
+coverage
+*.log
+tools/bin
+artifacts/attacks

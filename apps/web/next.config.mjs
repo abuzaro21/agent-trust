@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Minimal server bundle for containerized deployment.
+  output: 'standalone',
   // Workspace packages ship TypeScript source (monorepo convention) —
   // compile them through Next rather than requiring a build step.
   transpilePackages: [

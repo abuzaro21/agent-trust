@@ -22,6 +22,7 @@
     "@agent-trust/trust-profile": "workspace:*",
     "@agent-trust/vc": "workspace:*",
     "next": "^15.5.0",
+    "redis": "^6.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

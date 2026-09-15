@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,7 +41,28 @@ export const AUDITOR_DID = 'did:web:audit.acme.example:auditor';
 export const ANCHOR_DID = 'did:web:audit.acme.example:anchor';
 export const STREAM = 'acme-demo';
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+/**
+ * Repo-root resolution that survives BOTH dev (`import.meta.url` under
+ * apps/web/src/server) and production server bundles (chunks emitted under
+ * .next/server/**). Precedence: explicit env → walk up from module/cwd
+ * looking for artifacts/policy/policy.wasm → cwd.
+ */
+function findRepoRoot(): string {
+  const candidates = [process.env.AGENT_TRUST_REPO_ROOT, dirname(fileURLToPath(import.meta.url)), process.cwd()];
+  for (const start of candidates) {
+    if (start === undefined || start === '') continue;
+    let dir = start;
+    for (let up = 0; up < 8; up++) {
+      const candidate = join(dir, 'artifacts', 'policy', 'policy.wasm');
+      if (existsSync(candidate)) return dir;
+      dir = resolve(dir, '..');
+    }
+  }
+  return process.cwd();
+}
+
+const REPO_ROOT = findRepoRoot();
+export const ATTACKS_DIR = join(REPO_ROOT, 'artifacts', 'attacks');
 const WASM_PATH = join(REPO_ROOT, 'artifacts/policy/policy.wasm');
 const MANIFEST_PATH = join(REPO_ROOT, 'artifacts/policy/manifest.json');
 
@@ -70,6 +92,8 @@ export interface DemoWorld {
   /** Re-anchor the signed checkpoint over the CURRENT chain head. */
   anchor: () => Promise<SignedAuditCheckpoint>;
   latestCheckpoint: SignedAuditCheckpoint | null;
+  /** 'redis' when DEMO_REDIS_URL is live; 'in-memory' otherwise. */
+  replayStoreKind: 'redis' | 'in-memory';
 }
 
 // Next.js may evaluate route bundles in separate module graphs — anchor the
@@ -148,7 +172,13 @@ async function buildDemoWorld(): Promise<DemoWorld> {
     quarantineStore: quarantine,
   });
 
-  const replayProtector = new ReplayProtector(new InMemoryReplayStore({ clock: () => NOW }));
+  // DEMO_REDIS_URL (optional): use the real atomic SET NX PX replay store
+  // in deployment; in-memory stays the zero-config default for local dev.
+  const replayStore = await pickReplayStore();
+  const replayProtector = new ReplayProtector(replayStore);
+  const replayStoreKind = process.env.DEMO_REDIS_URL !== undefined && process.env.DEMO_REDIS_URL !== ''
+    ? 'redis' as const
+    : 'in-memory' as const;
   const policy = await loadOpaWasmPolicyEngine(WASM_PATH, MANIFEST_PATH);
   if (!policy.ok) {
     throw new Error(`policy artifact failed to load (${policy.reasonCode}): ${policy.detail}`);
@@ -225,6 +255,7 @@ async function buildDemoWorld(): Promise<DemoWorld> {
     evilSigner,
     orgSigner,
     primaryDelegationJws,
+    replayStoreKind,
     anchor,
     get latestCheckpoint() {
       return latestCheckpoint;
@@ -262,6 +293,26 @@ export async function profileSnapshot(agentDid?: string): Promise<ProfileSnapsho
   });
   const profile = await service.build(target, { now: NOW, context: { action: 'refund:create' } });
   return { profile };
+}
+
+async function pickReplayStore(): Promise<import('@agent-trust/replay').ReplayStore> {
+  const url = process.env.DEMO_REDIS_URL;
+  if (url === undefined || url === '') {
+    return new InMemoryReplayStore({ clock: () => NOW });
+  }
+  try {
+    const { createClient } = await import('redis');
+    const client = createClient({ url });
+    await client.connect();
+    await client.ping();
+    const { RedisReplayStore } = await import('@agent-trust/replay');
+    return new RedisReplayStore(client, { clock: () => NOW });
+  } catch (e) {
+    // Fail toward SAFETY: without the real store, protected writes use the
+    // in-memory CLAIM-ONCE store of this process (single-instance demo).
+    console.warn(`DEMO_REDIS_URL unreachable (${String(e)}); using in-memory replay store`);
+    return new InMemoryReplayStore({ clock: () => NOW });
+  }
 }
 
 // ------------------------------------------------------------ scenarios

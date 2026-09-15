@@ -1,4 +1,6 @@
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { LocalSigner, withDid, canonicalJson, sha256, utf8, base64urlEncode, type Signer } from '@agent-trust/crypto';
 import { DidKeyResolver, InMemoryDidResolver, MultiDidResolver, didDocumentForJwk } from '@agent-trust/did';
@@ -32,8 +34,29 @@ export const EVIL_DID = 'did:web:evil.example:agent';
 export const ANCHOR_DID = `did:web:${HOST}:audit`;
 export const STREAM = 'attack-demo';
 
-const WASM_PATH = join(import.meta.dirname, '../../../artifacts/policy/policy.wasm').replaceAll('\\', '/');
-const MANIFEST_PATH = join(import.meta.dirname, '../../../artifacts/policy/manifest.json').replaceAll('\\', '/');
+// Locate the hash-pinned policy artifact regardless of execution layout:
+// plain Node/tsx from the repo (dev), vitest, or a bundled server (Docker
+// standalone), where import.meta.dirname no longer points into the repo.
+function findAttackRepoRoot(): string {
+  const starts = [process.env.AGENT_TRUST_REPO_ROOT, process.cwd()];
+  for (const start of starts) {
+    if (start === undefined || start === '') continue;
+    let dir = resolve(start);
+    for (let up = 0; up < 8; up++) {
+      if (existsSync(join(dir, 'artifacts', 'policy', 'policy.wasm'))) return dir;
+      const parent = resolve(dir, '..');
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  // Fall back to the source-relative path (dev/tsx layout, pre-bundle).
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+}
+const ROOT = findAttackRepoRoot();
+const WASM_PATH = join(ROOT, 'artifacts', 'policy', 'policy.wasm').replaceAll('\\', '/');
+const MANIFEST_PATH = join(ROOT, 'artifacts', 'policy', 'manifest.json').replaceAll('\\', '/');
+/** Committed artifact paths, resolved for any execution layout. */
+export const ATTACK_WASM_PATH = WASM_PATH;
 
 export interface AttackWorld {
   gateway: TrustGateway;
