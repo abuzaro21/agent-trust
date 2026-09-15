@@ -1,3 +1,4 @@
+import { SCHEMA_ID_BITSTRING_STATUS_ENTRY } from './status-entry.schema.js';
 import type { JsonSchema } from '../json-schema.js';
 
 export const SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS =
@@ -42,7 +43,7 @@ export const membershipCredentialClaimsSchema: JsonSchema = {
             runtimeBinding: { type: 'string', minLength: 1 },
           },
         },
-        credentialStatus: { type: 'object' },
+        credentialStatus: { $ref: `${SCHEMA_ID_BITSTRING_STATUS_ENTRY}#` },
       },
     },
   },

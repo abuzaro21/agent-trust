@@ -19,6 +19,8 @@ export interface MembershipInput {
   runtimeBinding?: string;
   validFrom: TimeInput;
   validUntil?: TimeInput;
+  /** Optional BitstringStatusListEntry binding (Step 6). */
+  credentialStatus?: Record<string, unknown>;
 }
 
 export interface DelegationInput {
@@ -26,6 +28,8 @@ export interface DelegationInput {
   authority: Authority;
   validFrom: TimeInput;
   validUntil?: TimeInput;
+  /** Optional BitstringStatusListEntry binding (Step 6). */
+  credentialStatus?: Record<string, unknown>;
 }
 
 /**
@@ -53,6 +57,7 @@ export class CredentialIssuer {
       subjectDid: input.subjectDid,
       validFrom: input.validFrom,
       validUntil: input.validUntil,
+      credentialStatus: input.credentialStatus,
     });
   }
 
@@ -65,6 +70,7 @@ export class CredentialIssuer {
       subjectDid: input.subjectDid,
       validFrom: input.validFrom,
       validUntil: input.validUntil,
+      credentialStatus: input.credentialStatus,
     });
   }
 
@@ -74,6 +80,7 @@ export class CredentialIssuer {
     subjectDid: string;
     validFrom: TimeInput;
     validUntil?: TimeInput;
+    credentialStatus?: Record<string, unknown>;
   }): Promise<{ jws: string; claims: CredentialClaims }> {
     const kid = await this.#signer.keyId();
     const issuerDid = parseDidUrl(kid).did;
@@ -87,6 +94,9 @@ export class CredentialIssuer {
       vc: {
         type: input.type,
         credentialSubject: input.credentialSubject,
+        ...(input.credentialStatus !== undefined
+          ? { credentialStatus: input.credentialStatus }
+          : {}),
       },
     };
     const jws = await signCompactJws(this.#signer, claims as unknown as Record<string, unknown>);

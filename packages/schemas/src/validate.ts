@@ -53,6 +53,10 @@ import {
   policyInputSchema,
 } from './schemas/policy-input.schema.js';
 import {
+  SCHEMA_ID_BITSTRING_STATUS_ENTRY,
+  bitstringStatusEntrySchema,
+} from './schemas/status-entry.schema.js';
+import {
   SCHEMA_ID_TRUST_EVALUATE_REQUEST,
   trustEvaluateRequestSchema,
 } from './schemas/trust-evaluate.schema.js';
@@ -67,6 +71,7 @@ export const ALL_SCHEMAS = [
   didDocumentSchema,
   delegationCredentialClaimsSchema,
   membershipCredentialClaimsSchema,
+  bitstringStatusEntrySchema,
 ] as const;
 
 export const SCHEMA_IDS = [
@@ -79,6 +84,7 @@ export const SCHEMA_IDS = [
   SCHEMA_ID_DID_DOCUMENT,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
   SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
+  SCHEMA_ID_BITSTRING_STATUS_ENTRY,
 ] as const;
 
 export interface ValidationOutcome {

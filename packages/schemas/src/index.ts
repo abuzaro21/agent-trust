@@ -39,3 +39,7 @@ export {
   SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
   membershipCredentialClaimsSchema,
 } from './schemas/membership-credential-claims.schema.js';
+export {
+  SCHEMA_ID_BITSTRING_STATUS_ENTRY,
+  bitstringStatusEntrySchema,
+} from './schemas/status-entry.schema.js';

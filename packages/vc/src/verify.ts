@@ -17,6 +17,7 @@ import {
   verifyCompactJwsSignature,
 } from './jws.js';
 import { IssuerTrustStore } from './trust.js';
+import type { AgentQuarantineStore, CredentialStatusChecker, CredentialStatusResult } from './status-seam.js';
 import {
   type CredentialClaims,
   type CredentialType,
@@ -37,6 +38,14 @@ export interface VerifyOptions {
 export interface VerifierDeps {
   didResolver: DidResolver;
   trustStore: IssuerTrustStore;
+  /**
+   * Optional status gate (Step 6). When absent, credentials that DECLARE a
+   * status mechanism are denied CREDENTIAL_STATUS_UNAVAILABLE — a declared
+   * check we cannot run never passes silently.
+   */
+  statusChecker?: CredentialStatusChecker;
+  /** Optional emergency kill switch (Step 6G), keyed by subject DID. */
+  quarantineStore?: AgentQuarantineStore;
 }
 
 const CLAIMS_SCHEMA_BY_TYPE: Record<CredentialType, string> = {
@@ -57,21 +66,28 @@ const BASE_TYPE = 'VerifiableCredential';
  *  5. issuer DID resolution                           → DID_RESOLUTION_FAILED
  *  6. kid belongs to the issuer DID                   → VC_ISSUER_KEY_MISMATCH
  *  7. signature over the received bytes               → VC_SIGNATURE_INVALID
- *  8. issuer trusted for this type                    → UNTRUSTED_ISSUER
+ *  8. issuer trusted for this credential type          → UNTRUSTED_ISSUER
  *  9. validFrom / validUntil                          → VC_NOT_YET_VALID / VC_EXPIRED
  * 10. expected subject                                → WRONG_SUBJECT
+ * 11. credential status (when declared)               → CREDENTIAL_REVOKED /
+ *     (stage 2b, before all of the above,                CREDENTIAL_SUSPENDED /
+ *      is the quarantine kill switch)                    CREDENTIAL_STATUS_UNAVAILABLE
  *
- * A valid signature alone never equals trust — stages 8–10 exist precisely
+ * A valid signature alone never equals trust — stages 8–11 exist precisely
  * because stages 1–7 prove integrity, not acceptance.
  */
 export class CredentialVerifier {
   readonly #didResolver: DidResolver;
   readonly #trustStore: IssuerTrustStore;
+  readonly #statusChecker: CredentialStatusChecker | undefined;
+  readonly #quarantineStore: AgentQuarantineStore | undefined;
   readonly #validator: Validator;
 
   constructor(deps: VerifierDeps) {
     this.#didResolver = deps.didResolver;
     this.#trustStore = deps.trustStore;
+    this.#statusChecker = deps.statusChecker;
+    this.#quarantineStore = deps.quarantineStore;
     this.#validator = createValidator();
   }
 
@@ -103,6 +119,13 @@ export class CredentialVerifier {
       typeof claims.vc.credentialSubject.id !== 'string'
     ) {
       return deny('VC_SCHEMA_INVALID');
+    }
+
+    // Stage 2b — emergency quarantine kill switch. Runs before anything
+    // else: a quarantined agent is blocked regardless of credential state.
+    if (this.#quarantineStore !== undefined) {
+      const quarantined = await this.#quarantineStore.isQuarantined(claims.sub);
+      if (quarantined) return deny('AGENT_QUARANTINED');
     }
 
     // Stage 3 — closed set of supported credential types.
@@ -148,6 +171,28 @@ export class CredentialVerifier {
     // Stage 10 — expected subject.
     if (opts.expectedSubject !== undefined && opts.expectedSubject !== claims.sub) {
       return deny('WRONG_SUBJECT');
+    }
+
+    // Stage 11 — credential status gate. Only runs when the credential
+    // DECLARES a status mechanism; credentials without credentialStatus
+    // keep their pre-Step-6 behavior. Declared-but-uncheckable fails closed.
+    const statusEntry = claims.vc.credentialStatus;
+    if (statusEntry !== undefined) {
+      if (this.#statusChecker === undefined) return deny('CREDENTIAL_STATUS_UNAVAILABLE');
+      let result: CredentialStatusResult;
+      try {
+        result = await this.#statusChecker.check({
+          credentialId: claims.jti,
+          issuerDid: claims.iss,
+          status: statusEntry,
+          now,
+        });
+      } catch {
+        return deny('CREDENTIAL_STATUS_UNAVAILABLE');
+      }
+      if (result.state === 'REVOKED') return deny('CREDENTIAL_REVOKED');
+      if (result.state === 'SUSPENDED') return deny('CREDENTIAL_SUSPENDED');
+      if (result.state !== 'ACTIVE') return deny('CREDENTIAL_STATUS_UNAVAILABLE');
     }
 
     return { valid: true, facts: buildFacts(credentialType, claims as CredentialClaims), claims: claims as CredentialClaims };

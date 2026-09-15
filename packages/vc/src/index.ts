@@ -32,3 +32,13 @@ export {
   type VerifyOptions,
   type VerifierDeps,
 } from './verify.js';
+
+export type {
+  AgentQuarantineStore,
+  CredentialStatusCheckInput,
+  CredentialStatusChecker,
+  CredentialStatusEntry,
+  CredentialStatusResult,
+  CredentialStatusState,
+  StatusGateDenial,
+} from './status-seam.js';

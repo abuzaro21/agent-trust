@@ -1,4 +1,5 @@
 import { SCHEMA_ID_AUTHORITY } from './authority.schema.js';
+import { SCHEMA_ID_BITSTRING_STATUS_ENTRY } from './status-entry.schema.js';
 import type { JsonSchema } from '../json-schema.js';
 
 export const SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS =
@@ -46,7 +47,7 @@ export const delegationCredentialClaimsSchema: JsonSchema = {
             authority: { $ref: `${SCHEMA_ID_AUTHORITY}#` },
           },
         },
-        credentialStatus: { type: 'object' },
+        credentialStatus: { $ref: `${SCHEMA_ID_BITSTRING_STATUS_ENTRY}#` },
       },
     },
   },

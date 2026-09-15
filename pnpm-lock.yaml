@@ -51,6 +51,21 @@ importers:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.20.0)
 
+  packages/status:
+    dependencies:
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:../did
+      '@agent-trust/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:../vc
+
   packages/vc:
     dependencies:
       '@agent-trust/crypto':
