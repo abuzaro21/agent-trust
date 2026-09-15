@@ -1,0 +1,57 @@
+# Judge Checklist
+
+Every challenge requirement mapped to a concrete, inspectable artifact.
+Nothing vague; every row is clickable or runnable.
+
+## Challenge requirements
+
+| Requirement | Artifact | Where |
+|---|---|---|
+| **Trust profile** (contextual evidence, no score) | `TrustProfileService` + dashboard Trust Profile panel (live did:web DID, authority, attestations, history) | `packages/trust-profile/src/service.ts` · dashboard `/` left column |
+| **Action history** | Hash-chained Action Receipts + signed checkpoints; profile aggregates from the VERIFIED chain only | `packages/audit/src/` · dashboard audit panel · `GET /api/audit/acme-demo` |
+| **Authority scope** (grant limited, attenuated) | `AgentDelegationCredential` with actions/resources/audience/amount/window/depth; `Authority(child) ⊆ Authority(parent)` walker | `packages/delegation/src/` · profile "Authority" box |
+| **Vouches / attestations** | `AgentAttestationCredential` through the full VC pipeline; issuer+type-scoped trust; evidence-only (a rejected self-vouch is visible on the dashboard) | `packages/trust-profile` · `packages/vc` |
+| **Verifiable credentials** | W3C VC 2.0-style compact JWS, ES256/P-256, 11-stage verification incl. status binding | `packages/vc/src/` |
+| **Grant / scope issuance** | Org issuer signs delegations; trusted-issuer registry gates whose claims count | `packages/vc` `CredentialIssuer` + `InMemoryIssuerTrustStore` |
+| **Revoke** | W3C Bitstring Status List (permanent revocation, reversible suspension) + emergency quarantine — current status kills authority | `packages/status/src/` · "Revoked Credential" preset |
+| **Accept / refuse a task** | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` |
+| **Live demo (HTTPS URL)** | **BLOCKER — see below** (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
+| **Public repository** | github.com/abuzaro21/agent-trust (MIT, CI on every push) | GitHub |
+| **90-second walkthrough** | Script timed at ~87 s; recording pending (needs the public URL — not recorded against localhost pretending to be public) | `docs/submission/loom-script.md` |
+| **Architecture snapshot** | One-screen diagram, this package | `docs/submission/architecture.md` |
+| **Failure thinking / negative tests** | 60/60 adversarial suite (52 attacks + 8 failure demos) judged on reason code AND side-effect invariants; served at `/attacks`; CI gate `pnpm test:attacks` | `packages/attacks/` |
+| **Two-year thesis** | 282 words (≤300 limit) | `docs/submission/two-year-thesis.md` |
+| **AI tools notes** | Honest disclosure incl. seven caught AI mistakes | `docs/submission/ai-tools-and-decisions.md` |
+| **Standards story** | did:web live identities on public HTTPS: `did:web:abuzaro21.github.io:agents:{org,support,refund}` (public documents + repo `abuzaro21/abuzaro21.github.io`) · VC 2.0-style JWS · JOSE ES256 · RFC 8785 · Bitstring Status List · Rego/OPA Wasm | docs/credential-model.md · docs/architecture.md |
+
+## Rubric dimensions → demonstrating artifacts
+
+(No self-scores; each row names where a judge can verify the claim directly.)
+
+| Dimension | Best evidence |
+|---|---|
+| **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
+| **Technical depth (25)** | 425 core + 27 frontend + 5 integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Demo quality (20)** | Live dashboard: presets, pipeline view, receipts, profile, DID badges; 5 screenshots at 1440×900; Loom script (once recorded on public URL) |
+| **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed everywhere (incl. startup config: Redis/did:web misconfig refuses boot) · documented bugs-caught table |
+| **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
+
+## Submission status
+
+```text
+SUBMISSION BLOCKER (only one):
+PUBLIC_DASHBOARD_URL
+
+Exact procedure after a provider login (e.g. Fly.io):
+  1. fly launch (uses deploy/fly.example.toml — set DEMO_DID_DOMAIN=abuzaro21.github.io)
+  2. fly redis create
+  3. fly secrets set DEMO_REDIS_URL=... DEMO_ORG_KEY_JSON=... \
+       DEMO_SUPPORT_KEY_JSON=... DEMO_REFUND_KEY_JSON=... DEMO_BUILD_SHA=$(git rev-parse --short HEAD)
+  4. fly deploy
+  5. DEMO_PUBLIC_URL=https://<host>.fly.dev corepack pnpm smoke:live   → require 45/45
+Then record the Loom per loom-script.md checklist, pin screenshots to the
+deployed commit, and create tag builders-league-submission-v1 on the final SHA.
+```
+
+Key values live only in `.local/` (gitignored); they are generated by
+`pnpm demo:did:init` and are the SAME keys the public DID documents bind.

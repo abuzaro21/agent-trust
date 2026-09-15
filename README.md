@@ -6,6 +6,8 @@
 
 ## Live Demo
 
+> **Walkthrough: recording pending** (script timed and ready:
+> [docs/submission/loom-script.md](docs/submission/loom-script.md)).
 > The interactive demo (real `did:web` identities + Redis-backed replay + the
 > full gateway) runs from one command — see Quickstart below. A public hosted
 > URL is pending a hosting-provider account; everything needed to deploy it is
@@ -187,9 +189,7 @@ agent-trust/
 
 ## Status & Roadmap
 
-**🚧 Architecture frozen — implementation underway (scaffold stage).**
-
-Delivery architecture (P0) is deliberately narrower than the target architecture; the riskiest components are P1 adapters behind stable interfaces, so the live demo never depends on them.
+**✅ Architecture and features FROZEN for submission (Step 17).** Every P0 element below is implemented, tested (425 core + 27 frontend + 5 Redis integration + 60/60 adversarial + 13 native Rego), CI-gated, containerized, and verified in live did:web identity mode; the only outstanding item is the public dashboard URL itself (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)).
 
 | Phase | Scope |
 |---|---|
@@ -332,6 +332,8 @@ The project's own rule applies: **no UI before cross-agent E2E works** — a sin
 - [Trust model](docs/trust-model.md) — trust profiles, reputation-as-evidence, decision objects
 - [Roadmap](docs/roadmap.md) — phases, build order, definition of done
 - [ADRs](docs/adr/) — frozen architecture decisions ([ADR-0004: did:web live identity plane](docs/adr/0004-did-web-live-identity.md))
+- [Deployment (Step 16)](docs/deployment.md) — env contract, state model, public identities
+- [Submission package](docs/submission/final-submission.md) — judge summary, 90-s script, two-year thesis, out-of-scope, checklist
 - [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
