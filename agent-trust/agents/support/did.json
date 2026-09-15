@@ -1,0 +1,20 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:abuzaro21.github.io:agent-trust:agents:support",
+  "verificationMethod": [
+    {
+      "id": "did:web:abuzaro21.github.io:agent-trust:agents:support#JS5gauWe27iMmDI39RljDZR7H_3SXlFfAUSN-D5WPso",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:abuzaro21.github.io:agent-trust:agents:support",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "rLQiR8SYSJ0AqtXYD_oh0ii7E7c9p7e1lJHy4Art1vI",
+        "y": "g3nBhlRVJvmZebyIN3lFMvCBoHmtoNf4_95NftnleVY"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:abuzaro21.github.io:agent-trust:agents:support#JS5gauWe27iMmDI39RljDZR7H_3SXlFfAUSN-D5WPso"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:web:abuzaro21.github.io:agent-trust:agents:refund",
+  "verificationMethod": [
+    {
+      "id": "did:web:abuzaro21.github.io:agent-trust:agents:refund#pct6O1qItX9a_BoNbUywVroXC8k8IugoeO_BidlNVec",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:abuzaro21.github.io:agent-trust:agents:refund",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "uTtpBd1hwKIhRH7BNzGxVTlu3hEwvhCb4LGO4hu8EeU",
+        "y": "Dn5qVIN1OjOkwQA73VHo5tajom5K3JhZKNc7MptzbT0"
+      }
+    }
+  ],
+  "authentication": [
+    "did:web:abuzaro21.github.io:agent-trust:agents:refund#pct6O1qItX9a_BoNbUywVroXC8k8IugoeO_BidlNVec"
+  ]
+}
