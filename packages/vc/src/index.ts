@@ -1,5 +1,8 @@
 export {
   SUPPORTED_CREDENTIAL_TYPES,
+  type AgentAttestation,
+  type AttestationStatement,
+  type AttestationType,
   type CredentialClaims,
   type CredentialDocument,
   type CredentialType,

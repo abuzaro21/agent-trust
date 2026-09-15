@@ -32,6 +32,16 @@ export interface DelegationInput {
   credentialStatus?: Record<string, unknown>;
 }
 
+export interface AttestationInput {
+  subjectDid: string;
+  attestation: import('./types.js').AgentAttestation;
+  validFrom: TimeInput;
+  validUntil?: TimeInput;
+  /** Optional BitstringStatusListEntry binding — attestation revocation
+   * reuses credential status, never a custom mechanism (Step 11S). */
+  credentialStatus?: Record<string, unknown>;
+}
+
 /**
  * Issues compact-JWS credentials through the Signer seam. The signer's DID
  * labels the issuer; key material never leaves the Signer implementation.
@@ -67,6 +77,19 @@ export class CredentialIssuer {
     return this.issue({
       type: ['VerifiableCredential', 'AgentDelegationCredential'],
       credentialSubject: { id: input.subjectDid, authority: input.authority },
+      subjectDid: input.subjectDid,
+      validFrom: input.validFrom,
+      validUntil: input.validUntil,
+      credentialStatus: input.credentialStatus,
+    });
+  }
+
+  async issueAttestation(
+    input: AttestationInput,
+  ): Promise<{ jws: string; claims: CredentialClaims }> {
+    return this.issue({
+      type: ['VerifiableCredential', 'AgentAttestationCredential'],
+      credentialSubject: { id: input.subjectDid, attestation: input.attestation },
       subjectDid: input.subjectDid,
       validFrom: input.validFrom,
       validUntil: input.validUntil,

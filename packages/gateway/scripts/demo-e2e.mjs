@@ -31,6 +31,13 @@ import {
   verifyCheckpointSignature,
 } from '@agent-trust/audit';
 
+import {
+  InMemoryAgentCredentialStore,
+  InMemoryAttestationStore,
+  InMemoryAttestationTrustPolicy,
+  TrustProfileService,
+} from '@agent-trust/trust-profile';
+
 import { DemoRefundExecutor } from '../src/executor.js';
 import { TrustGateway } from '../src/gateway.js';
 import { createTaskRequest } from '../src/request.js';
@@ -297,6 +304,33 @@ async function main() {
       dim(`    seq ${String(rc.body.sequence).padStart(2)} ${rc.body.decision.effect.padEnd(5)} ${rc.body.correlation?.taskId ?? ''} ${rc.eventHash.slice(0, 12)}…`),
     );
   }
+
+  // ---- Step 11 (additive): evidence-based Trust Profile -----------------------
+  banner('Trust Profile (Step 11): evidence read model over the same pipeline');
+  const profileService = new TrustProfileService({
+    didResolver: resolver,
+    verifier,
+    attestationStore: new InMemoryAttestationStore(),
+    agentCredentialStore: new InMemoryAgentCredentialStore(),
+    attestationTrust: new InMemoryAttestationTrustPolicy(),
+    auditLog,
+    auditCheckpoint: checkpoint,
+    auditStreamId: STREAM,
+    checkpointSignerDid: ANCHOR_DID,
+  });
+  const profile = await profileService.build(SUPPORT_AGENT_DID, {
+    now: NOW_UNIX,
+    context: { action: 'refund:create' },
+  });
+  console.log(`  identity resolved: ${profile.identity.resolved ? g('true') : r('false')}`);
+  console.log(`  authority (verified delegations): ${c(String(profile.authority.active.length))}`);
+  console.log(`  attestations trusted/rejected: ${profile.attestations.trusted.length} / ${profile.attestations.rejected.length} ${dim('(evidence — never authority)')}`);
+  const integ = profile.history.integrity;
+  console.log(`  history integrity: ${integ.verified ? g('VERIFIED') : r('FAIL-CLOSED')}${integ.verified ? dim(` through sequence ${integ.verifiedThroughSequence}`) : ''}`);
+  for (const [action, entry] of Object.entries(profile.history.byAction)) {
+    console.log(`    ${action}: allow=${entry.decisions.allow} deny=${entry.decisions.deny} succeeded=${entry.execution.succeeded} failed=${entry.execution.failed} uncertain=${entry.execution.uncertain}`);
+  }
+  console.log(dim('  the profile is a READ MODEL — policy remains the only authorization engine'));
 
   console.log(`\n${b('demo complete')} — trust is contextual authority backed by verifiable evidence, not a score.\n`);
 }

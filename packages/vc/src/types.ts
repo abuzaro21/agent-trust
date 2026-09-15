@@ -2,14 +2,47 @@ import type { Authority, ReasonCode } from '@agent-trust/schemas';
 
 /**
  * Credential types this fabric can issue and verify. Anything else is
- * VC_TYPE_UNSUPPORTED — a closed set, by design.
+ * VC_TYPE_UNSUPPORTED — a closed set, by design. Attestations (Step 11)
+ * are EVIDENCE, never authority: they pass through the same verification
+ * pipeline and issuer-trust registry as every other credential.
  */
 export const SUPPORTED_CREDENTIAL_TYPES = [
   'AgentMembershipCredential',
   'AgentDelegationCredential',
+  'AgentAttestationCredential',
 ] as const;
 
 export type CredentialType = (typeof SUPPORTED_CREDENTIAL_TYPES)[number];
+
+/**
+ * Signed attestation claims (Step 11D) — closed machine-readable
+ * categories, never free-text semantics. An attestation is EVIDENCE:
+ * it grants no authority, bypasses nothing, and is verified through the
+ * exact same pipeline (schema, issuer resolution, kid ownership,
+ * signature, issuer trust, dates, subject, status) as every credential.
+ */
+export type AttestationType =
+  | 'CAPABILITY_ENDORSEMENT'
+  | 'SECURITY_REVIEW'
+  | 'OPERATIONAL_APPROVAL';
+
+export type AttestationStatement = 'ENDORSED' | 'APPROVED' | 'OBSERVED';
+
+export interface AgentAttestation {
+  type: AttestationType;
+  domain: string;
+  statement: AttestationStatement;
+  scope?: {
+    actions?: string[];
+    resources?: string[];
+    audience?: string[];
+  };
+  evidence?: {
+    uri?: string;
+    /** sha256 hex digest of the referenced evidence. */
+    digest?: string;
+  };
+}
 
 /**
  * W3C VC 2.0 claims in the JOSE (JWT) profile: issuer=iss, subject=sub,
@@ -63,6 +96,8 @@ export interface VerifiedFacts {
     organization?: string;
     runtimeBinding?: string;
   };
+  /** Present only for AgentAttestationCredential (Step 11). */
+  attestation?: AgentAttestation;
 }
 
 /**

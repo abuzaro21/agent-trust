@@ -15,7 +15,8 @@
     "policy:test": "opa test --fail-on-empty policies/",
     "setup:opa": "node scripts/setup-opa.mjs",
     "build:policy": "node scripts/build-policy.mjs",
-    "demo:e2e": "tsx packages/gateway/scripts/demo-e2e.mjs"
+    "demo:e2e": "tsx packages/gateway/scripts/demo-e2e.mjs",
+    "demo:profile": "tsx packages/trust-profile/scripts/demo-profile.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

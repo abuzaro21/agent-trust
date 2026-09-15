@@ -227,7 +227,7 @@ describe('VC negative controls', () => {
 
   it('rejects an unsupported credential type', async () => {
     const { jws } = await issuer.issue({
-      type: ['VerifiableCredential', 'AgentAttestationCredential'],
+      type: ['VerifiableCredential', 'AgentReputationScoreCredential'],
       credentialSubject: { id: AGENT_DID, predicate: 'certified' },
       subjectDid: AGENT_DID,
       validFrom: NOW - 100,

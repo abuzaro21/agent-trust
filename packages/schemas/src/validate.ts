@@ -74,6 +74,14 @@ import {
   policyResultSchema,
 } from './schemas/policy-result.schema.js';
 import {
+  SCHEMA_ID_ATTESTATION_CREDENTIAL_CLAIMS,
+  attestationCredentialClaimsSchema,
+} from './schemas/attestation-credential.schema.js';
+import {
+  SCHEMA_ID_TRUST_PROFILE,
+  trustProfileSchema,
+} from './schemas/trust-profile.schema.js';
+import {
   SCHEMA_ID_TRUST_EVALUATE_REQUEST,
   trustEvaluateRequestSchema,
 } from './schemas/trust-evaluate.schema.js';
@@ -93,6 +101,8 @@ export const ALL_SCHEMAS = [
   bitstringStatusEntrySchema,
   verifiedFactsSchema,
   policyResultSchema,
+  attestationCredentialClaimsSchema,
+  trustProfileSchema,
 ] as const;
 
 export const SCHEMA_IDS = [
@@ -110,6 +120,8 @@ export const SCHEMA_IDS = [
   SCHEMA_ID_BITSTRING_STATUS_ENTRY,
   SCHEMA_ID_VERIFIED_FACTS,
   SCHEMA_ID_POLICY_RESULT,
+  SCHEMA_ID_ATTESTATION_CREDENTIAL_CLAIMS,
+  SCHEMA_ID_TRUST_PROFILE,
 ] as const;
 
 export interface ValidationOutcome {

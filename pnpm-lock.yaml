@@ -93,6 +93,9 @@ importers:
       '@agent-trust/schemas':
         specifier: workspace:*
         version: link:../schemas
+      '@agent-trust/trust-profile':
+        specifier: workspace:*
+        version: link:../trust-profile
       '@agent-trust/vc':
         specifier: workspace:*
         version: link:../vc
@@ -161,6 +164,34 @@ importers:
       '@agent-trust/vc':
         specifier: workspace:*
         version: link:../vc
+
+  packages/trust-profile:
+    dependencies:
+      '@agent-trust/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:../did
+      '@agent-trust/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:../vc
+    devDependencies:
+      '@agent-trust/policy':
+        specifier: workspace:*
+        version: link:../policy
+      '@agent-trust/replay':
+        specifier: workspace:*
+        version: link:../replay
+      '@agent-trust/status':
+        specifier: workspace:*
+        version: link:../status
 
   packages/vc:
     dependencies:

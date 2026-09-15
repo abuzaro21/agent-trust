@@ -1,5 +1,5 @@
 {
-  "name": "@agent-trust/gateway",
+  "name": "@agent-trust/trust-profile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,15 +11,13 @@
   "dependencies": {
     "@agent-trust/audit": "workspace:*",
     "@agent-trust/crypto": "workspace:*",
-    "@agent-trust/delegation": "workspace:*",
     "@agent-trust/did": "workspace:*",
-    "@agent-trust/policy": "workspace:*",
-    "@agent-trust/replay": "workspace:*",
     "@agent-trust/schemas": "workspace:*",
-    "@agent-trust/trust-profile": "workspace:*",
     "@agent-trust/vc": "workspace:*"
   },
   "devDependencies": {
-    "@agent-trust/status": "workspace:*"
+    "@agent-trust/policy": "workspace:*",
+    "@agent-trust/status": "workspace:*",
+    "@agent-trust/replay": "workspace:*"
   }
 }

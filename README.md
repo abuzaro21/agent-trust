@@ -109,6 +109,8 @@ flowchart LR
     B --> LOG[Hash-chained Action Receipts]
     ENFORCE --> LOG
     LOG --> CHECKPOINT[Signed Checkpoints]
+    LOG --> PROFILE[Trust Profile<br/>evidence read model]
+    ATTEST[Attestation Credentials<br/>issuer+type-scoped] --> PROFILE
 ```
 
 Full details: [docs/architecture.md](docs/architecture.md) · [threat model](docs/threat-model.md) · [credential model](docs/credential-model.md) · [trust model](docs/trust-model.md)
@@ -168,6 +170,9 @@ docker compose up -d redis   # one-command dev Redis (port 6380 — 6379 is
                              # machines; CI uses 6379)
 TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
 
+pnpm demo:e2e           # cross-agent gateway demonstration (all real components)
+pnpm demo:profile       # evidence-based Trust Profiles — attestations, history, integrity
+
 # Policy pipeline (requires the pinned OPA v1.20.2 on PATH, or tools/bin):
 pnpm policy:fmt && pnpm policy:check && pnpm policy:test
 pnpm build:policy       # → artifacts/policy/policy.wasm + manifest.json (hash-pinned)
@@ -187,6 +192,7 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 | `@agent-trust/policy` | Embedded OPA Wasm engine (ADR-0002): hash-pinned artifact, `VerifiedFacts`-only input, deterministic denial precedence |
 | `@agent-trust/audit` | Hash-chained Action Receipts (domain-separated SHA-256, RFC 8785 bodies), atomic append, signed checkpoints, tamper/truncation/rewrite detection |
 | `@agent-trust/gateway` | **The Trust Gateway** — composes every layer into one authorized path: PoP → replay → VC/status → delegation chain → VerifiedFacts → policy → decision receipt → idempotent executor → outcome receipt. Receipts only for authenticated actors; audit-before-side-effect; executor unreachable without gateway authorization. |
+| `@agent-trust/trust-profile` | **Trust Profiles (read model)** — contextual, evidence-based answers to "what VERIFIED evidence exists for this agent": resolved identity, active authority with evidence digests, issuer+type-scoped attestations, and aggregated history from the VERIFIED audit chain + signed checkpoint (history fails closed independently). `AgentAttestationCredential` passes the FULL VC pipeline; attestations are EVIDENCE, never authority. The profile schema structurally forbids score fields — no trust/reputation number exists, and the profile never bypasses policy. |
 
 ## Architecture: the authorized path
 

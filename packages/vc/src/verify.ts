@@ -4,6 +4,7 @@ import { parseDidUrl } from '@agent-trust/did';
 import {
   type Authority,
   type ReasonCode,
+  SCHEMA_ID_ATTESTATION_CREDENTIAL_CLAIMS,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
   SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
   type Validator,
@@ -51,6 +52,7 @@ export interface VerifierDeps {
 const CLAIMS_SCHEMA_BY_TYPE: Record<CredentialType, string> = {
   AgentMembershipCredential: SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,
   AgentDelegationCredential: SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
+  AgentAttestationCredential: SCHEMA_ID_ATTESTATION_CREDENTIAL_CLAIMS,
 };
 
 const BASE_TYPE = 'VerifiableCredential';
@@ -237,6 +239,9 @@ function buildFacts(credentialType: CredentialType, claims: CredentialClaims): V
   };
   if (credentialType === 'AgentDelegationCredential') {
     facts.authority = claims.vc.credentialSubject.authority as Authority;
+  } else if (credentialType === 'AgentAttestationCredential') {
+    const { id: _id, attestation } = claims.vc.credentialSubject as Record<string, unknown>;
+    facts.attestation = attestation as VerifiedFacts['attestation'];
   } else {
     const { id: _id, controller, organization, runtimeBinding } =
       claims.vc.credentialSubject as Record<string, unknown>;

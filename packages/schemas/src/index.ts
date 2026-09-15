@@ -57,3 +57,11 @@ export {
   SCHEMA_ID_POLICY_RESULT,
   policyResultSchema,
 } from './schemas/policy-result.schema.js';
+export {
+  SCHEMA_ID_ATTESTATION_CREDENTIAL_CLAIMS,
+  attestationCredentialClaimsSchema,
+} from './schemas/attestation-credential.schema.js';
+export {
+  SCHEMA_ID_TRUST_PROFILE,
+  trustProfileSchema,
+} from './schemas/trust-profile.schema.js';
