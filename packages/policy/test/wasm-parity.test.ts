@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -8,8 +9,19 @@ import { canonicalPolicyInput, type VerifiedFactsFixture } from './fixture.js';
 
 const WASM_PATH = join(__dirname, '../../../artifacts/policy/policy.wasm').replaceAll('\\', '/');
 const MANIFEST_PATH = join(__dirname, '../../../artifacts/policy/manifest.json').replaceAll('\\', '/');
-const OPA_BIN = join(__dirname, '../../../tools/bin', process.platform === 'win32' ? 'opa.exe' : 'opa').replaceAll('\\', '/');
 const POLICY_FILE = join(__dirname, '../../../policies/agent-trust/decision.rego').replaceAll('\\', '/');
+
+/** Resolve the OPA CLI: OPA_BIN env → tools/bin → PATH. */
+function resolveOpaBin(): string {
+  const envBin = process.env.OPA_BIN;
+  if (envBin !== undefined && existsSync(envBin)) return envBin;
+  const localName = process.platform === 'win32' ? 'opa.exe' : 'opa';
+  const local = join(__dirname, '../../../tools/bin', localName);
+  if (existsSync(local)) return local;
+  return 'opa'; // assume on PATH; spawn failure surfaces as a clear ENOENT
+}
+
+const OPA_BIN = resolveOpaBin();
 
 function opaEvalStdin(input: unknown, timeoutMs = 30_000): Promise<string> {
   return new Promise((resolve, reject) => {

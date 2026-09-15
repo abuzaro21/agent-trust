@@ -80,6 +80,8 @@ jobs:
 
       - name: Tests (unit + property + Wasm runtime suite, no Redis required)
         run: pnpm test
+        env:
+          OPA_BIN: /usr/local/bin/opa
 
       - name: Redis integration tests (real Redis, SET NX PX atomicity)
         run: pnpm test:integration
