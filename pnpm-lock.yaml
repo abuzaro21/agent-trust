@@ -48,6 +48,43 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.13.4)(tsx@4.23.13)
 
+  packages/attacks:
+    dependencies:
+      '@agent-trust/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:../did
+      '@agent-trust/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@agent-trust/policy':
+        specifier: workspace:*
+        version: link:../policy
+      '@agent-trust/replay':
+        specifier: workspace:*
+        version: link:../replay
+      '@agent-trust/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@agent-trust/status':
+        specifier: workspace:*
+        version: link:../status
+      '@agent-trust/trust-profile':
+        specifier: workspace:*
+        version: link:../trust-profile
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:../vc
+    devDependencies:
+      '@agent-trust/delegation':
+        specifier: workspace:*
+        version: link:../delegation
+
   packages/audit:
     dependencies:
       '@agent-trust/crypto':

@@ -172,6 +172,8 @@ TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
 
 pnpm demo:e2e           # cross-agent gateway demonstration (all real components)
 pnpm demo:profile       # evidence-based Trust Profiles — attestations, history, integrity
+pnpm demo:attacks       # adversarial suite: 60 deterministic scenarios, invariants too
+pnpm test:attacks       # same suite as a CI gate (exits non-zero on any FAIL)
 pnpm demo:did:init      # one-time live identity setup → did:web docs + gitignored local keys
 pnpm demo:did:resolve did:web:example.com:agents:support   # real HTTPS resolution + diagnostics
 DEMO_DID_DOMAIN=example.com pnpm demo:e2e:web              # live did:web mode (deployment-gated)
@@ -196,6 +198,7 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 | `@agent-trust/audit` | Hash-chained Action Receipts (domain-separated SHA-256, RFC 8785 bodies), atomic append, signed checkpoints, tamper/truncation/rewrite detection |
 | `@agent-trust/gateway` | **The Trust Gateway** — composes every layer into one authorized path: PoP → replay → VC/status → delegation chain → VerifiedFacts → policy → decision receipt → idempotent executor → outcome receipt. Receipts only for authenticated actors; audit-before-side-effect; executor unreachable without gateway authorization. |
 | `@agent-trust/trust-profile` | **Trust Profiles (read model)** — contextual, evidence-based answers to "what VERIFIED evidence exists for this agent": resolved identity, active authority with evidence digests, issuer+type-scoped attestations, and aggregated history from the VERIFIED audit chain + signed checkpoint (history fails closed independently). `AgentAttestationCredential` passes the FULL VC pipeline; attestations are EVIDENCE, never authority. The profile schema structurally forbids score fields — no trust/reputation number exists, and the profile never bypasses policy. |
+| `@agent-trust/attacks` | **Adversarial suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each judges the denial reason AND the side-effect invariants (executor calls, victim attribution, cache state, profile immutability); machine-readable `artifacts/attacks/attack-report.{json,md}` |
 
 ## Architecture: the authorized path
 

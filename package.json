@@ -19,7 +19,9 @@
     "demo:profile": "tsx packages/trust-profile/scripts/demo-profile.mjs",
     "demo:did:init": "tsx scripts/demo-did-init.mjs",
     "demo:did:resolve": "tsx scripts/demo-did-resolve.mjs",
-    "demo:e2e:web": "tsx scripts/demo-e2e-web.mjs"
+    "demo:e2e:web": "tsx scripts/demo-e2e-web.mjs",
+    "demo:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs",
+    "test:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs --ci"
   },
   "devDependencies": {
     "@agent-trust/audit": "workspace:*",

@@ -101,19 +101,56 @@ describe('cache semantics (12Q–12T)', () => {
     expect(entry.expiresAt - entry.fetchedAt).toBe(600_000);
   });
 
-  it('server cannot force a NEGATIVE or zero TTL; minimum lifetime applies', async () => {
+  it('EXPLICIT max-age=0 → immediately stale: never cached as fresh (emergency-rotation semantics)', async () => {
+    // Pre-Step-13 review found the old behavior installed a 1 ms "fresh"
+    // entry — under key compromise the server publishing max-age=0 must
+    // WIN, so the next resolution always re-fetches.
+    let calls = 0;
+    const clock = { now: 1_000_000 };
+    const resolver = new WebDidResolver({
+      clock: () => clock.now, // frozen: a fresh-cache shortcut would show here
+      http: clientOf(async () => {
+        calls += 1;
+        return { status: 200, headers: { 'cache-control': 'max-age=0' }, body: JSON.stringify(docFor(KEY_A)) };
+      }),
+    });
+    const r1 = await resolver.resolve(DID);
+    expect(r1.didDocument?.id).toBe(DID);
+    expect(resolver.peekCache(DID)).toBeUndefined();
+    await resolver.resolve(DID);
+    expect(calls).toBe(2); // re-fetched — the stale marker is honored
+  });
+
+  it('max-age=0 + network failure → FAIL CLOSED (no cache to fall back to)', async () => {
+    let broken = false;
     const clock = { now: 1_000_000 };
     const resolver = new WebDidResolver({
       clock: () => clock.now,
+      http: clientOf(async () => {
+        if (broken) throw new Error('ECONNRESET');
+        return { status: 200, headers: { 'cache-control': 'max-age=0' }, body: JSON.stringify(docFor(KEY_A)) };
+      }),
+    });
+    await resolver.resolve(DID);
+    broken = true;
+    const r = await resolver.resolve(DID);
+    expect(r.didDocument).toBeNull();
+  });
+
+  it('no Cache-Control header → bounded defaultCacheTtl applies (documented)', async () => {
+    const clock = { now: 1_000_000 };
+    const resolver = new WebDidResolver({
+      clock: () => clock.now,
+      defaultCacheTtlMs: 30_000,
       http: clientOf(async () => ({
         status: 200,
-        headers: { 'cache-control': 'max-age=0' },
+        headers: {},
         body: JSON.stringify(docFor(KEY_A)),
       })),
     });
     await resolver.resolve(DID);
     const entry = resolver.peekCache(DID)!;
-    expect(entry.expiresAt).toBeGreaterThan(entry.fetchedAt);
+    expect(entry.expiresAt - entry.fetchedAt).toBe(30_000);
   });
 
   it('invalid response (wrong id) is NEVER cached; a later valid response succeeds (12V poisoning)', async () => {

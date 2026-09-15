@@ -44,6 +44,7 @@ decision := {"effect": "ALLOW", "reasonCodes": allow_reasons} if {
 
 refund_action_authorized if {
 	input.request.action == "refund:create"
+	input.request.action in input.authority.actions
 }
 
 # --- contextual authority checks ----------------------------------------

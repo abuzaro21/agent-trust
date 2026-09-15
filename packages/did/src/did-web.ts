@@ -447,8 +447,23 @@ export class WebDidResolver implements DidResolver {
       };
     }
 
-    // 12R: TTL = min(server max-age, maxCacheTtl); bounded default otherwise.
+    // 12R/13-prestep: TTL = min(server max-age, maxCacheTtl); bounded default
+    // only when the server sends NO usable lifetime. An explicit max-age=0
+    // means the representation is IMMEDIATELY STALE — the entry is not
+    // installed as fresh (during key compromise the server must win: the
+    // next resolution always re-fetches). The configured defaultCacheTtl
+    // applies ONLY to the no-header case and is deliberately documented
+    // (ADR-0004).
     const maxAge = cacheMaxAgeSeconds(response.headers);
+    if (maxAge === 0) {
+      return {
+        didDocument: validation.document,
+        didResolutionMetadata: {
+          contentType: 'application/did+json',
+          message: 'served without caching (Cache-Control: max-age=0)',
+        },
+      };
+    }
     const ttlMs =
       maxAge === null
         ? this.#defaultCacheTtlMs

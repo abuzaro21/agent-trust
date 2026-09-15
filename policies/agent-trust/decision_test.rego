@@ -110,6 +110,16 @@ test_missing_required_input_denied if {
 	result.reasonCodes == ["ACTION_NOT_IN_SCOPE"]
 }
 
+test_action_missing_from_authority_denied if {
+	# The delegation's actions list omits refund:create — even though the
+	# request is the supported action, the delegated SCOPE denies it.
+	# (Step 13, found by AUTHORITY-002: the original rule checked only the
+	# supported-action whitelist, not the delegated action set.)
+	result := eval(patch(base, [{"op": "replace", "path": "/authority/actions", "value": ["order:read"]}]))
+	result.effect == "DENY"
+	result.reasonCodes == ["ACTION_NOT_IN_SCOPE"]
+}
+
 test_denial_precedence_action_first if {
 	# Action AND amount both violated → action wins (precedence 1 > 7).
 	result := eval(patch(base, [

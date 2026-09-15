@@ -83,6 +83,11 @@ jobs:
         env:
           OPA_BIN: /usr/local/bin/opa
 
+      - name: Adversarial attack suite (deterministic, no public network)
+        run: pnpm test:attacks
+        env:
+          OPA_BIN: /usr/local/bin/opa
+
       - name: Redis integration tests (real Redis, SET NX PX atomicity)
         run: pnpm test:integration
         env:
