@@ -153,6 +153,25 @@ describe('ReplayProtector (7F/7E/7G)', () => {
     expect(huge).toMatchObject({ outcome: 'denied', reasonCode: 'REQUEST_MALFORMED' });
   });
 
+  it('pre-Step-8 regression: retention NEVER truncates below proof validity (4h proof → denied, store untouched)', async () => {
+    // UNSAFE would be: store the claim with a truncated 1h TTL, letting the
+    // same still-valid proof replay during hours 2–4. The invariant is
+    // replay retention MUST cover the entire remaining acceptance window —
+    // so a proof whose lifetime exceeds maxRetentionSeconds is rejected
+    // outright, before any store write.
+    const store = new InMemoryReplayStore({ clock: () => NOW });
+    const protector = new ReplayProtector(store, { maxRetentionSeconds: 3_600 });
+    const fourHours = await protector.verifyAndClaim({ ...base, exp: NOW + 4 * 3_600 });
+    expect(fourHours).toEqual({
+      outcome: 'denied',
+      reasonCode: 'REQUEST_MALFORMED',
+      replayChecked: false,
+      replayClaimed: false,
+    });
+    // Nothing was claimed: the jti was never stored under a truncated TTL.
+    expect(store.size).toBe(0);
+  });
+
   it('maps store outage to REPLAY_PROTECTION_UNAVAILABLE (7K)', async () => {
     const failing: import('../src/types.js').ReplayStore = {
       async claim() {

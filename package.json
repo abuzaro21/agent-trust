@@ -10,6 +10,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "policy:fmt": "opa fmt --fail policies/",
+    "policy:check": "opa check policies/",
+    "policy:test": "opa test --fail-on-empty policies/",
+    "setup:opa": "node scripts/setup-opa.mjs",
+    "build:policy": "node scripts/build-policy.mjs",
     "demo:e2e": "echo \"demo:e2e lands with the cross-agent E2E phase — see docs/roadmap.md build order step 10\""
   },
   "devDependencies": {

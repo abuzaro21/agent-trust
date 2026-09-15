@@ -43,3 +43,11 @@ export {
   SCHEMA_ID_BITSTRING_STATUS_ENTRY,
   bitstringStatusEntrySchema,
 } from './schemas/status-entry.schema.js';
+export {
+  SCHEMA_ID_VERIFIED_FACTS,
+  verifiedFactsSchema,
+} from './schemas/verified-facts.schema.js';
+export {
+  SCHEMA_ID_POLICY_RESULT,
+  policyResultSchema,
+} from './schemas/policy-result.schema.js';

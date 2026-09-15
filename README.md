@@ -163,11 +163,17 @@ pnpm install
 pnpm typecheck          # strict TS across the workspace
 pnpm test               # vitest unit + property suite (no services needed)
 pnpm test:integration   # Redis-backed replay tests (needs TEST_REDIS_URL)
-docker compose up -d redis   # one-command dev Redis
-TEST_REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration
+docker compose up -d redis   # one-command dev Redis (port 6380 — 6379 is
+                             # inside a Windows excluded-port range on some
+                             # machines; CI uses 6379)
+TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
+
+# Policy pipeline (requires the pinned OPA v1.20.2 on PATH, or tools/bin):
+pnpm policy:fmt && pnpm policy:check && pnpm policy:test
+pnpm build:policy       # → artifacts/policy/policy.wasm + manifest.json (hash-pinned)
 ```
 
-Implemented packages (Phases 1–4 — identity, credentials, delegation, status, replay):
+Implemented packages (Phases 1–5 — identity, credentials, delegation, status, replay, policy):
 
 | Package | Contents |
 |---|---|
@@ -178,6 +184,7 @@ Implemented packages (Phases 1–4 — identity, credentials, delegation, status
 | `@agent-trust/delegation` | `Authority(child) ⊆ Authority(parent)` attenuator + chain walker with cycle detection, property-tested with fast-check |
 | `@agent-trust/status` | W3C Bitstring Status List (revocation = permanent, suspension = reversible), `StatusListManager` semantic mutations, signed status-list credentials reusing the VC stack, and the agent quarantine kill switch — all fail-closed |
 | `@agent-trust/replay` | Atomic CLAIM-ONCE replay protection (ADR-0003): in-memory store, Redis `SET NX PX` adapter, post-cryptography claim ordering (invalid proofs can never poison a jti), TTL derived from the proof lifetime, fail-closed on store outage |
+| `@agent-trust/policy` | Embedded OPA Wasm policy engine (ADR-0002): `policies/*.rego` → `opa build -t wasm` → hash-verified `policy.wasm` loaded **once** in-process. Rego decides over `VerifiedFacts` only — every crypto/status/replay gate is enforced upstream. Deterministic denial precedence, structured reason codes, native↔Wasm parity-tested, fail-closed on every infrastructure failure. |
 
 The project's own rule applies: **no UI before cross-agent E2E works** — a single `pnpm demo:e2e` must print that Agent A was accepted or rejected for the right reasons before any dashboard exists.
 

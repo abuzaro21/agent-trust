@@ -1,0 +1,22 @@
+{
+  "name": "@agent-trust/policy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-trust/schemas": "workspace:*",
+    "@open-policy-agent/opa-wasm": "^1.10.0"
+  },
+  "devDependencies": {
+    "@agent-trust/crypto": "workspace:*",
+    "@agent-trust/did": "workspace:*",
+    "@agent-trust/replay": "workspace:*",
+    "@agent-trust/status": "workspace:*",
+    "@agent-trust/vc": "workspace:*"
+  }
+}

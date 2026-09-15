@@ -42,6 +42,31 @@ importers:
         specifier: workspace:*
         version: link:../crypto
 
+  packages/policy:
+    dependencies:
+      '@agent-trust/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@open-policy-agent/opa-wasm':
+        specifier: ^1.10.0
+        version: 1.10.0
+    devDependencies:
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:../did
+      '@agent-trust/replay':
+        specifier: workspace:*
+        version: link:../replay
+      '@agent-trust/status':
+        specifier: workspace:*
+        version: link:../status
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:../vc
+
   packages/replay:
     dependencies:
       '@agent-trust/crypto':
@@ -257,6 +282,9 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@open-policy-agent/opa-wasm@1.10.0':
+    resolution: {integrity: sha512-ymR/nFS3nO9o24j9xowGGQaf+Gmb813QcxUpVZkfRlJkawKWqSIllnEH15agyWjijmOIyhA+OBErenx6N3jphw==}
 
   '@redis/bloom@6.2.1':
     resolution: {integrity: sha512-huQgNLaCIZfQ9SeLn4q9124uOUd8HbZDYHwwUzNcRgHqCHiHKl2dDxMqJCeWh8cMqZAoWuHR8XnWbDMIf+o7ag==}
@@ -621,6 +649,9 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
+  sprintf-js@1.1.3:
+    resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
+
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
 
@@ -738,6 +769,10 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  yaml@1.10.3:
+    resolution: {integrity: sha512-vIYeF1u3CjlhAFekPPAk2h/Kv4T3mAkMox5OymRiJQB0spDP10LHvt+K7G9Ny6NuuMAb25/6n1qyUjAcGNf/AA==}
+    engines: {node: '>= 6'}
+
 snapshots:
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -822,6 +857,11 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@open-policy-agent/opa-wasm@1.10.0':
+    dependencies:
+      sprintf-js: 1.1.3
+      yaml: 1.10.3
 
   '@redis/bloom@6.2.1(@redis/client@6.2.1)':
     dependencies:
@@ -1139,6 +1179,8 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
+  sprintf-js@1.1.3: {}
+
   stackback@0.0.2: {}
 
   std-env@3.10.0: {}
@@ -1244,3 +1286,5 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  yaml@1.10.3: {}

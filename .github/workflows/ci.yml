@@ -1,18 +1,22 @@
 name: CI
 
 # Phase gate: grows per roadmap phase (docs/roadmap.md#ci-gates).
-# Current: repo integrity + typecheck + unit/contract tests + Redis-backed
-# replay integration (real Redis via service container — no mocks) +
-# key-material scan.
+# Current: repo integrity + typecheck + unit/property tests + Rego
+# (fmt/check/native tests) + Wasm build + manifest hash verification +
+# Wasm runtime tests + Redis-backed replay integration (real Redis via
+# service container — no mocks) + key-material scan.
 
 on:
   push:
     branches: [main]
   pull_request:
 
+env:
+  OPA_VERSION: v1.20.2
+
 jobs:
   gate:
-    name: Typecheck + tests + Redis integration
+    name: Typecheck + tests + Rego/Wasm + Redis integration
     runs-on: ubuntu-latest
     services:
       redis:
@@ -34,13 +38,42 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Install pinned OPA (${{ env.OPA_VERSION }})
+        run: |
+          curl -sL -o /tmp/opa https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static
+          chmod +x /tmp/opa
+          sudo mv /tmp/opa /usr/local/bin/opa
+          opa version
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Tests (unit + property suite, no Redis required)
+      - name: Rego fmt
+        run: opa fmt --fail policies/
+
+      - name: Rego check
+        run: opa check policies/
+
+      - name: Rego native tests
+        run: opa test --fail-on-empty policies/
+
+      - name: Compile policy.wasm + verify manifest hash
+        run: |
+          opa build -t wasm -e agenttrust/decision -o /tmp/policy-bundle.tar.gz policies/agent-trust/decision.rego
+          mkdir -p /tmp/policy-build && tar -xzf /tmp/policy-bundle.tar.gz -C /tmp/policy-build
+          ACTUAL="sha256:$(sha256sum /tmp/policy-build/policy.wasm | awk '{print $1}')"
+          EXPECTED=$(node -e "console.log(require('./artifacts/policy/manifest.json').sha256)")
+          echo "compiled: $ACTUAL"
+          echo "manifest: $EXPECTED"
+          test "$ACTUAL" = "$EXPECTED" || {
+            echo "::error::Committed policy.wasm does not match Rego source. Rebuild artifacts (pnpm build:policy) and commit."
+            exit 1
+          }
+
+      - name: Tests (unit + property + Wasm runtime suite, no Redis required)
         run: pnpm test
 
       - name: Redis integration tests (real Redis, SET NX PX atomicity)
