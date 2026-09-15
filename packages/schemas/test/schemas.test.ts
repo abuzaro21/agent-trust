@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  SCHEMA_ID_ACTION_RECEIPT,
+  SCHEMA_ID_ACTION_RECEIPT_BODY,
+  SCHEMA_ID_ACTION_RECEIPT_ENVELOPE,
+  SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD,
   SCHEMA_ID_AGENT_PROOF,
   SCHEMA_ID_AUTHORITY,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
@@ -169,29 +171,90 @@ describe('trust-evaluate-request schema', () => {
   });
 });
 
-describe('action-receipt schema', () => {
-  const sha = `sha256:${'0'.repeat(64)}`;
-  const valid = {
-    eventId: 'evt_01',
-    actorDid: 'did:web:agents.acme.example:support-1',
-    action: 'refund:create',
-    resource: 'order:ORD-918',
-    decisionId: 'dec_01JABCDEFGH',
-    effect: 'ALLOW',
-    requestHash: sha,
-    previousHash: 'genesis',
-    eventHash: `sha256:${'1'.repeat(64)}`,
-    timestamp: '2026-09-13T12:00:00Z',
+describe('action-receipt schemas (Step 9)', () => {
+  const hex = (c: string) => c.repeat(64);
+  const validBody = {
+    receiptId: 'rcpt_01JABCDEF01',
+    streamId: 'acme-demo',
+    sequence: 1,
+    recordedAt: '2026-09-15T12:00:00Z',
+    actor: { did: 'did:web:agents.acme.example:support-1', controller: 'did:web:acme.example:org' },
+    request: {
+      action: 'refund:create',
+      resource: 'order:ORD-918',
+      audience: 'did:web:payments.example:refund-agent',
+      parameters: { amount: 120, currency: 'SAR' },
+    },
+    authority: { credentialId: 'vc_abc12345', issuer: 'did:web:acme.example:org', authorityDigest: hex('a') },
+    security: {
+      proofVerified: true,
+      credentialVerified: true,
+      issuerTrusted: true,
+      credentialActive: true,
+      quarantined: false,
+      replayChecked: true,
+    },
+    decision: {
+      effect: 'ALLOW',
+      reasonCodes: ['IDENTITY_VERIFIED', 'WITHIN_AMOUNT_LIMIT'],
+      policy: { id: 'agent-trust-refund', version: '1.1.0', hash: `sha256:${hex('b')}` },
+    },
   };
 
-  it('accepts a genesis receipt', () => {
-    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT, valid).valid).toBe(true);
+  it('accepts a canonical receipt body and a genesis envelope around it', () => {
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_BODY, validBody).valid).toBe(true);
+    const envelope = {
+      body: validBody,
+      previousHash: '0'.repeat(64), // genesis
+      eventHash: hex('c'),
+    };
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_ENVELOPE, envelope).valid).toBe(true);
   });
 
-  it('rejects a previousHash that is neither a sha256 ref nor genesis', () => {
-    expect(
-      v.validate(SCHEMA_ID_ACTION_RECEIPT, { ...valid, previousHash: 'md5:xyz' }).valid,
-    ).toBe(false);
+  it('rejects DENY receipts without reason codes and non-const security facts', () => {
+    const denyBody = structuredClone(validBody);
+    denyBody.decision.effect = 'DENY';
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_BODY, denyBody).valid).toBe(true);
+
+    const lying = structuredClone(validBody);
+    (lying.security as Record<string, unknown>).proofVerified = false;
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_BODY, lying).valid).toBe(false);
+  });
+
+  it('rejects an envelope with a non-hex previousHash (no bare "genesis" string)', () => {
+    const envelope = {
+      body: validBody,
+      previousHash: 'genesis',
+      eventHash: hex('c'),
+    };
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_ENVELOPE, envelope).valid).toBe(false);
+  });
+
+  it('rejects secret-bearing extras (additionalProperties: false)', () => {
+    const leaky = { ...structuredClone(validBody), accessToken: 'eyJhbGciOi...' } as Record<string, unknown>;
+    expect(v.validate(SCHEMA_ID_ACTION_RECEIPT_BODY, leaky).valid).toBe(false);
+  });
+});
+
+describe('audit-checkpoint-payload schema', () => {
+  const valid = {
+    checkpointId: 'ckpt_01JABCDEFGH',
+    streamId: 'acme-demo',
+    sequence: 100,
+    headHash: 'a'.repeat(64),
+    issuedAt: '2026-09-15T12:00:00Z',
+    algorithm: 'sha256',
+    chainFormat: 'agent-trust/action-receipt/v1',
+  };
+
+  it('accepts a canonical checkpoint payload', () => {
+    expect(v.validate(SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD, valid).valid).toBe(true);
+  });
+
+  it('rejects a wrong algorithm, wrong chainFormat, or sha256:-prefixed headHash', () => {
+    expect(v.validate(SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD, { ...valid, algorithm: 'md5' }).valid).toBe(false);
+    expect(v.validate(SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD, { ...valid, chainFormat: 'other/v9' }).valid).toBe(false);
+    expect(v.validate(SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD, { ...valid, headHash: `sha256:${'a'.repeat(64)}` }).valid).toBe(false);
   });
 });
 
@@ -273,6 +336,32 @@ describe('delegation-credential-claims schema', () => {
         },
       }).valid,
     ).toBe(true);
+  });
+
+  it('pre-Step-9 regression: non-canonical UTC forms are rejected (lexicographic-time safety)', () => {
+    const withTime = (value: string) => ({
+      ...valid,
+      vc: {
+        ...valid.vc,
+        credentialSubject: {
+          ...valid.vc.credentialSubject,
+          authority: {
+            ...valid.vc.credentialSubject.authority,
+            validUntil: value,
+          },
+        },
+      },
+    });
+    // Timezone offset breaks lexicographic vs chronological equality.
+    expect(v.validate(SCHEMA_ID_AUTHORITY, { ...valid.vc.credentialSubject.authority, validUntil: '2026-10-13T02:00:00+02:00' }).valid).toBe(false);
+    // Fractional seconds change string width (".500" sorts AFTER "Z"-less
+    // forms incorrectly) — not canonical.
+    expect(v.validate(SCHEMA_ID_AUTHORITY, { ...valid.vc.credentialSubject.authority, validUntil: '2026-10-13T00:00:00.500Z' }).valid).toBe(false);
+    // Non-UTC zone designator.
+    expect(v.validate(SCHEMA_ID_AUTHORITY, { ...valid.vc.credentialSubject.authority, validUntil: '2026-10-13T00:00:00+00:00' }).valid).toBe(false);
+    // Through the delegation claims schema too.
+    expect(v.validate(SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS, withTime('2026-10-13T00:00:00.500Z')).valid).toBe(false);
+    expect(v.validate(SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS, withTime('2026-10-13T00:00:00Z')).valid).toBe(true);
   });
 });
 

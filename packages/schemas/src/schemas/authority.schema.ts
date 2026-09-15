@@ -2,6 +2,17 @@ import type { JsonSchema } from '../json-schema.js';
 
 export const SCHEMA_ID_AUTHORITY = 'https://agent-trust.dev/schemas/authority.json';
 
+/**
+ * Canonical UTC timestamp: the Wasm policy compares authority time windows
+ * lexicographically (time.parse_rfc3339_ns is unavailable in OPA's Wasm
+ * runtime), which is chronologically correct ONLY in this exact form —
+ * fixed width, zero-padded, UTC 'Z', no offsets, no fractional seconds.
+ * Pre-Step-9 review pinned this at the AUTHORITY boundary (delegation VC
+ * claims are attacker-influencable input at verification time), not just
+ * in the VerifiedFacts schema.
+ */
+export const CANONICAL_UTC_PATTERN = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$';
+
 export const authoritySchema: JsonSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: SCHEMA_ID_AUTHORITY,
@@ -39,8 +50,8 @@ export const authoritySchema: JsonSchema = {
       },
     },
     delegationDepth: { type: 'integer', minimum: 0 },
-    validFrom: { type: 'string', format: 'date-time' },
-    validUntil: { type: 'string', format: 'date-time' },
+    validFrom: { type: 'string', pattern: CANONICAL_UTC_PATTERN },
+    validUntil: { type: 'string', pattern: CANONICAL_UTC_PATTERN },
   },
   $defs: {
     did: { type: 'string', pattern: '^did:[a-z0-9]+:.+' },

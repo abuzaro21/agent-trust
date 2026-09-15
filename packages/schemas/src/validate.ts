@@ -29,7 +29,16 @@ const Ajv2020 = requireCjs('ajv/dist/2020.js') as new (
 ) => Ajv2020Instance;
 const addFormats = requireCjs('ajv-formats') as (ajv: Ajv2020Instance) => Ajv2020Instance;
 
-import { SCHEMA_ID_ACTION_RECEIPT, actionReceiptSchema } from './schemas/action-receipt.schema.js';
+import {
+  SCHEMA_ID_ACTION_RECEIPT_BODY,
+  SCHEMA_ID_ACTION_RECEIPT_ENVELOPE,
+  actionReceiptBodySchema,
+  actionReceiptEnvelopeSchema,
+} from './schemas/action-receipt.schema.js';
+import {
+  SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD,
+  auditCheckpointPayloadSchema,
+} from './schemas/audit-checkpoint.schema.js';
 import { SCHEMA_ID_AGENT_PROOF, agentProofSchema } from './schemas/agent-proof.schema.js';
 import { SCHEMA_ID_AUTHORITY, authoritySchema } from './schemas/authority.schema.js';
 import {
@@ -75,7 +84,9 @@ export const ALL_SCHEMAS = [
   policyInputSchema,
   policyDecisionSchema,
   trustEvaluateRequestSchema,
-  actionReceiptSchema,
+  actionReceiptBodySchema,
+  actionReceiptEnvelopeSchema,
+  auditCheckpointPayloadSchema,
   didDocumentSchema,
   delegationCredentialClaimsSchema,
   membershipCredentialClaimsSchema,
@@ -90,7 +101,9 @@ export const SCHEMA_IDS = [
   SCHEMA_ID_POLICY_INPUT,
   SCHEMA_ID_POLICY_DECISION,
   SCHEMA_ID_TRUST_EVALUATE_REQUEST,
-  SCHEMA_ID_ACTION_RECEIPT,
+  SCHEMA_ID_ACTION_RECEIPT_BODY,
+  SCHEMA_ID_ACTION_RECEIPT_ENVELOPE,
+  SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD,
   SCHEMA_ID_DID_DOCUMENT,
   SCHEMA_ID_DELEGATION_CREDENTIAL_CLAIMS,
   SCHEMA_ID_MEMBERSHIP_CREDENTIAL_CLAIMS,

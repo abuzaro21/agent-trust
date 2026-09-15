@@ -1,15 +1,9 @@
 import type { JsonSchema } from '../json-schema.js';
+import { CANONICAL_UTC_PATTERN } from './authority.schema.js';
 
 export const SCHEMA_ID_VERIFIED_FACTS = 'https://agent-trust.dev/schemas/verified-facts.json';
 
-/**
- * Canonical UTC timestamp: the Wasm policy compares time windows
- * lexicographically (time.parse_rfc3339_ns is not implemented in OPA's
- * Wasm runtime), which is chronologically correct ONLY in this exact
- * Z-normalized form. The trusted fact-assembler produces these via
- * Date.toISOString().
- */
-export const CANONICAL_UTC_PATTERN = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$';
+export { CANONICAL_UTC_PATTERN };
 
 /**
  * The ONLY input the policy engine accepts (Step 8A): pre-verified facts

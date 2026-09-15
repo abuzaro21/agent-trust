@@ -21,6 +21,31 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.13.4)
 
+  packages/audit:
+    dependencies:
+      '@agent-trust/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@agent-trust/did':
+        specifier: workspace:*
+        version: link:../did
+      '@agent-trust/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@agent-trust/vc':
+        specifier: workspace:*
+        version: link:../vc
+    devDependencies:
+      '@agent-trust/policy':
+        specifier: workspace:*
+        version: link:../policy
+      '@agent-trust/replay':
+        specifier: workspace:*
+        version: link:../replay
+      '@agent-trust/status':
+        specifier: workspace:*
+        version: link:../status
+
   packages/crypto:
     dependencies:
       '@agent-trust/schemas':

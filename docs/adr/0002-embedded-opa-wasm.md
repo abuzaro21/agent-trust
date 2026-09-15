@@ -21,3 +21,11 @@ We need a policy layer that emits structured decisions (not booleans) with deter
 - (+) Rego outputs structured objects, which is exactly what our decision/reason-code contract needs.
 - (−) We lose OPA-service management features (decision logs UI, bundle service), so we own policy lifecycle explicitly: compilation, versioning, hashing, and decision logging are first-class code in `packages/policy-engine`.
 - Rego receives **only pre-verified facts** from the verification plane; it is never a cryptographic parser.
+
+## Addendum (Step 9 pre-check): cross-platform artifact reproducibility
+
+Empirically verified: OPA v1.20.2's **compiled Wasm bytes genuinely differ between platforms** — the *extracted* `policy.wasm` (not merely bundle/tar/gzip metadata) hashes differently when compiled by the Windows vs Linux builds of the same pinned OPA version (`sha256:137ba9a6…` vs `sha256:b83ea734…`), while remaining byte-stable per platform across rebuilds. The accepted P0 model therefore binds integrity and provenance rather than claiming universal reproducibility:
+
+1. committed `policy.wasm` ↔ manifest `sha256` (artifact integrity),
+2. manifest `regoSha256` ↔ committed `decision.rego` (platform-independent source binding),
+3. native-`opa eval` ↔ embedded-Wasm behavioral parity corpus (11 cases).

@@ -24,9 +24,15 @@ export {
   trustEvaluateRequestSchema,
 } from './schemas/trust-evaluate.schema.js';
 export {
-  SCHEMA_ID_ACTION_RECEIPT,
-  actionReceiptSchema,
+  SCHEMA_ID_ACTION_RECEIPT_BODY,
+  SCHEMA_ID_ACTION_RECEIPT_ENVELOPE,
+  actionReceiptBodySchema,
+  actionReceiptEnvelopeSchema,
 } from './schemas/action-receipt.schema.js';
+export {
+  SCHEMA_ID_AUDIT_CHECKPOINT_PAYLOAD,
+  auditCheckpointPayloadSchema,
+} from './schemas/audit-checkpoint.schema.js';
 export {
   SCHEMA_ID_DID_DOCUMENT,
   didDocumentSchema,
