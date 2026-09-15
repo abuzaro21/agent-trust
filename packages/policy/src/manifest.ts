@@ -35,6 +35,7 @@ export function validateManifestShape(value: unknown): PolicyManifest | null {
     version: m.version,
     entrypoint: m.entrypoint,
     sha256: m.sha256,
+    ...(typeof m.regoSha256 === 'string' ? { regoSha256: m.regoSha256 } : {}),
     compiledBy: m.compiledBy,
   };
 }

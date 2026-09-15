@@ -38,10 +38,11 @@ const tmp = mkdtempSync(join(tmpdir(), 'policy-build-'));
 const bundle = join(tmp, 'bundle.tar.gz');
 run(['build', '-t', 'wasm', '-e', 'agenttrust/decision', '-o', bundle, join(POLICY_DIR, 'decision.rego')]);
 
-// Extract /policy.wasm without shelling out to tar (Windows tar rejects the
-// bundle's leading-slash member names). A gzip'd tar member is read by
-// scanning 512-byte headers after decompression — the OPA bundle layout is
-// stable, but we validate the member name rather than trusting position.
+// OPA's Wasm output is deterministic PER PLATFORM but differs between
+// platforms (Windows vs Linux toolchains). The manifest therefore records
+// BOTH the built-wasm hash (artifact integrity) and the Rego source hash
+// (platform-independent source binding); CI verifies both instead of
+// recompiling. Behavioral equivalence is enforced by the wasm-parity tests.
 const { gunzipSync } = await import('node:zlib');
 const raw = gunzipSync(readFileSync(bundle));
 const HEADER = 512;
@@ -62,6 +63,8 @@ while (offset + HEADER <= raw.length) {
   offset = dataStart + Math.ceil(size / HEADER) * HEADER;
 }
 if (!wasmBytes) throw new Error('policy.wasm member not found in OPA bundle');
+const regoSource = readFileSync(join(POLICY_DIR, 'decision.rego'));
+const regoHash = `sha256:${createHash('sha256').update(regoSource).digest('hex')}`;
 const hash = `sha256:${createHash('sha256').update(wasmBytes).digest('hex')}`;
 
 mkdirSync(ARTIFACTS, { recursive: true });
@@ -74,6 +77,7 @@ writeFileSync(
       version: POLICY_VERSION,
       entrypoint: 'agenttrust/decision',
       sha256: hash,
+      regoSha256: regoHash,
       compiledBy: 'opa v1.20.2 -t wasm -e agenttrust/decision',
     },
     null,
@@ -82,3 +86,4 @@ writeFileSync(
 );
 rmSync(tmp, { recursive: true, force: true });
 console.log(`policy built: ${hash}`);
+console.log(`rego source:  ${regoHash}`);

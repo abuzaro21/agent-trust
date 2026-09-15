@@ -3,5 +3,6 @@
   "version": "1.1.0",
   "entrypoint": "agenttrust/decision",
   "sha256": "sha256:137ba9a6cee79ad65b575e07c7e7a9524397e1cfd4dd3f1c495343bc5abeb52d",
+  "regoSha256": "sha256:5f9d65c4976d1d7f47c906e18a958800c8eb99ff49b684232dea890b38d10cf4",
   "compiledBy": "opa v1.20.2 -t wasm -e agenttrust/decision"
 }

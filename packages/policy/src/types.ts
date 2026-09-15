@@ -33,7 +33,14 @@ export interface PolicyManifest {
   id: string;
   version: string;
   entrypoint: string;
+  /** sha256 of the committed policy.wasm (artifact integrity). */
   sha256: string;
+  /**
+   * sha256 of decision.rego (platform-independent source binding). OPA's
+   * Wasm output differs per platform, so CI verifies artifact + source
+   * hashes; behavioral equivalence is proven by the wasm-parity tests.
+   */
+  regoSha256?: string;
   compiledBy: string;
 }
 

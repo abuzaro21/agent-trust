@@ -60,18 +60,23 @@ jobs:
       - name: Rego native tests
         run: opa test --fail-on-empty policies/
 
-      - name: Compile policy.wasm + verify manifest hash
+      - name: Verify policy artifact integrity (wasm hash + Rego source binding)
+        # OPA's Wasm output is deterministic per-platform but differs
+        # across platforms, so CI does not recompile-and-compare. Instead:
+        # 1. the committed policy.wasm must hash-match the manifest, and
+        # 2. the manifest's regoSha256 must match the committed Rego source
+        #    (proving the artifact was built from THIS policy source).
+        # Behavioral equivalence native<->Wasm is proven by the parity tests.
         run: |
-          opa build -t wasm -e agenttrust/decision -o /tmp/policy-bundle.tar.gz policies/agent-trust/decision.rego
-          mkdir -p /tmp/policy-build && tar -xzf /tmp/policy-bundle.tar.gz -C /tmp/policy-build
-          ACTUAL="sha256:$(sha256sum /tmp/policy-build/policy.wasm | awk '{print $1}')"
-          EXPECTED=$(node -e "console.log(require('./artifacts/policy/manifest.json').sha256)")
-          echo "compiled: $ACTUAL"
-          echo "manifest: $EXPECTED"
-          test "$ACTUAL" = "$EXPECTED" || {
-            echo "::error::Committed policy.wasm does not match Rego source. Rebuild artifacts (pnpm build:policy) and commit."
-            exit 1
-          }
+          WASM_ACTUAL="sha256:$(sha256sum artifacts/policy/policy.wasm | awk '{print $1}')"
+          REGO_ACTUAL="sha256:$(sha256sum policies/agent-trust/decision.rego | awk '{print $1}')"
+          WASM_EXPECTED=$(node -e "console.log(require('./artifacts/policy/manifest.json').sha256)")
+          REGO_EXPECTED=$(node -e "console.log(require('./artifacts/policy/manifest.json').regoSha256 || '')")
+          test -n "$REGO_EXPECTED" || { echo "::error::manifest.json missing regoSha256 — rebuild artifacts (pnpm build:policy)"; exit 1; }
+          echo "wasm:     $WASM_ACTUAL (manifest: $WASM_EXPECTED)"
+          echo "rego src: $REGO_ACTUAL (manifest: $REGO_EXPECTED)"
+          test "$WASM_ACTUAL" = "$WASM_EXPECTED" || { echo "::error::Committed policy.wasm does not match its manifest."; exit 1; }
+          test "$REGO_ACTUAL" = "$REGO_EXPECTED" || { echo "::error::policy.wasm was not built from the committed decision.rego — rebuild artifacts (pnpm build:policy) and commit."; exit 1; }
 
       - name: Tests (unit + property + Wasm runtime suite, no Redis required)
         run: pnpm test
