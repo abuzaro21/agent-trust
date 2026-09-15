@@ -173,18 +173,49 @@ pnpm policy:fmt && pnpm policy:check && pnpm policy:test
 pnpm build:policy       # → artifacts/policy/policy.wasm + manifest.json (hash-pinned)
 ```
 
-Implemented packages (Phases 1–5 — identity, credentials, delegation, status, replay, policy):
+Implemented packages (Phases 1–6 — identity, credentials, delegation, status, replay, policy, gateway):
 
 | Package | Contents |
 |---|---|
 | `@agent-trust/schemas` | JSON Schema contracts (draft 2020-12), TS types, closed reason-code enum, ajv validator |
 | `@agent-trust/crypto` | Frozen `Signer` interface, ES256 `LocalSigner`, RFC 8785 canonical JSON, DPoP-style proof-of-possession |
 | `@agent-trust/did` | `DidResolver` seam (ADR-0001), `did:key` P-256, `did:web` with timeout/injectable fetch, method registry |
-| `@agent-trust/vc` | Compact-JWS W3C VC 2.0 issuance/verification — 11-stage pipeline: structure → schema → type → issuer resolution → kid ownership → signature → issuer trust → validity window → subject → status. Quarantine kill switch on verified identities. |
-| `@agent-trust/delegation` | `Authority(child) ⊆ Authority(parent)` attenuator + chain walker with cycle detection, property-tested with fast-check |
-| `@agent-trust/status` | W3C Bitstring Status List (revocation = permanent, suspension = reversible), `StatusListManager` semantic mutations, signed status-list credentials reusing the VC stack, and the agent quarantine kill switch — all fail-closed |
-| `@agent-trust/replay` | Atomic CLAIM-ONCE replay protection (ADR-0003): in-memory store, Redis `SET NX PX` adapter, post-cryptography claim ordering (invalid proofs can never poison a jti), TTL derived from the proof lifetime, fail-closed on store outage |
-| `@agent-trust/policy` | Embedded OPA Wasm policy engine (ADR-0002): `policies/*.rego` → `opa build -t wasm` → hash-verified `policy.wasm` loaded **once** in-process. Rego decides over `VerifiedFacts` only — every crypto/status/replay gate is enforced upstream. Deterministic denial precedence, structured reason codes, native↔Wasm parity-tested, fail-closed on every infrastructure failure. |
+| `@agent-trust/vc` | Compact-JWS W3C VC 2.0 issuance/verification — 11-stage pipeline. Quarantine kill switch on verified identities. |
+| `@agent-trust/delegation` | `Authority(child) ⊆ Authority(parent)` attenuator + chain walker with cycle detection, property-tested |
+| `@agent-trust/status` | W3C Bitstring Status List (revocation permanent, suspension reversible), signed status-list credentials, agent quarantine — fail-closed |
+| `@agent-trust/replay` | Atomic CLAIM-ONCE replay protection (ADR-0003): in-memory + Redis `SET NX PX`, post-crypto claim ordering, proof-derived TTL |
+| `@agent-trust/policy` | Embedded OPA Wasm engine (ADR-0002): hash-pinned artifact, `VerifiedFacts`-only input, deterministic denial precedence |
+| `@agent-trust/audit` | Hash-chained Action Receipts (domain-separated SHA-256, RFC 8785 bodies), atomic append, signed checkpoints, tamper/truncation/rewrite detection |
+| `@agent-trust/gateway` | **The Trust Gateway** — composes every layer into one authorized path: PoP → replay → VC/status → delegation chain → VerifiedFacts → policy → decision receipt → idempotent executor → outcome receipt. Receipts only for authenticated actors; audit-before-side-effect; executor unreachable without gateway authorization. |
+
+## Architecture: the authorized path
+
+```text
+SupportAgent (proposes)          the agent/LLM is NOT the authorization boundary
+      │  signed task (PoP bound to task content)
+      ▼
+Trust Gateway  ──────────────  VERIFICATION BOUNDARY
+      ├─ 1 request schema (fail closed)
+      ├─ 2 identity / PoP / DID / htu / time
+      ├─ 3 replay claim (Redis SET NX PX, post-crypto)
+      ├─ 4 credentials: selection → verification → status → quarantine
+      ├─ 5 delegation chain → effective attenuated authority
+      ├─ 6 VerifiedFacts (centralized builder)
+      ├─ 7 policy — OPA Wasm          POLICY BOUNDARY
+      ├─ 8 decision receipt           PROVENANCE BOUNDARY (audit-before-side-effect)
+      ├─ 9 DENY → stop, executor never called
+      ▼
+Action Executor  ────────────  SIDE-EFFECT BOUNDARY (idempotent by taskId)
+      ▼
+execution-outcome receipt (separate chained event)
+```
+
+The defining demonstration: the same fully-authenticated legitimate agent, same valid credentials — **120 SAR → ALLOW, 5000 SAR → DENY `AUTHORITY_LIMIT_EXCEEDED`**. Run it yourself:
+
+```bash
+corepack pnpm demo:e2e                                   # in-memory replay store (labeled)
+TEST_REDIS_URL=redis://127.0.0.1:6380 corepack pnpm demo:e2e   # real Redis SET NX PX
+```
 
 The project's own rule applies: **no UI before cross-agent E2E works** — a single `pnpm demo:e2e` must print that Agent A was accepted or rejected for the right reasons before any dashboard exists.
 

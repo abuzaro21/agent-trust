@@ -15,11 +15,12 @@
     "policy:test": "opa test --fail-on-empty policies/",
     "setup:opa": "node scripts/setup-opa.mjs",
     "build:policy": "node scripts/build-policy.mjs",
-    "demo:e2e": "echo \"demo:e2e lands with the cross-agent E2E phase — see docs/roadmap.md build order step 10\""
+    "demo:e2e": "tsx packages/gateway/scripts/demo-e2e.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "fast-check": "^4.10.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
   }

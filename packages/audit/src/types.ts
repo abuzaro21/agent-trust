@@ -49,6 +49,11 @@ export interface ActionReceiptBody {
     state: ExecutionState;
     resultDigest?: string;
   };
+  /** Append-only decision↔outcome correlation (Step 10). */
+  correlation?: {
+    taskId: string;
+    decisionReceiptId?: string;
+  };
 }
 
 export interface ActionReceipt {

@@ -1,0 +1,24 @@
+{
+  "name": "@agent-trust/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agent-trust/audit": "workspace:*",
+    "@agent-trust/crypto": "workspace:*",
+    "@agent-trust/delegation": "workspace:*",
+    "@agent-trust/did": "workspace:*",
+    "@agent-trust/policy": "workspace:*",
+    "@agent-trust/replay": "workspace:*",
+    "@agent-trust/schemas": "workspace:*",
+    "@agent-trust/vc": "workspace:*"
+  },
+  "devDependencies": {
+    "@agent-trust/status": "workspace:*"
+  }
+}

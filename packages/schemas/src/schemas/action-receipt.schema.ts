@@ -108,6 +108,21 @@ export const actionReceiptBodySchema: JsonSchema = {
         resultDigest: { type: 'string', pattern: HEX64 },
       },
     },
+    /**
+     * Append-only correlation (Step 10): the decision receipt and the
+     * execution-outcome receipt are SEPARATE chained receipts — never a
+     * mutation of one record. The outcome receipt references the decision
+     * receipt via decisionReceiptId; taskId is the idempotency key.
+     */
+    correlation: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['taskId'],
+      properties: {
+        taskId: { type: 'string', minLength: 1, maxLength: 128 },
+        decisionReceiptId: { type: 'string', minLength: 8 },
+      },
+    },
   },
 };
 

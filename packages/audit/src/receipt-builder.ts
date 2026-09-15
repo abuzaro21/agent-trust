@@ -44,6 +44,8 @@ export interface BuildReceiptBodyInput {
   security: ReceiptSecurityInput;
   decision: ReceiptDecisionInput;
   execution?: { state: ExecutionState; result?: unknown };
+  /** Append-only decision↔outcome correlation (Step 10). */
+  correlation?: { taskId: string; decisionReceiptId?: string };
 }
 
 /** sha256 hex of the canonical authority object (evidence digest). */
@@ -93,6 +95,16 @@ export function buildReceiptBody(input: BuildReceiptBodyInput): Omit<ActionRecei
             state: input.execution.state,
             ...(input.execution.result !== undefined
               ? { resultDigest: resultDigestOf(input.execution.result) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(input.correlation !== undefined
+      ? {
+          correlation: {
+            taskId: input.correlation.taskId,
+            ...(input.correlation.decisionReceiptId !== undefined
+              ? { decisionReceiptId: input.correlation.decisionReceiptId }
               : {}),
           },
         }
