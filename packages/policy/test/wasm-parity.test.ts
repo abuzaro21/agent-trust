@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -11,21 +11,38 @@ const WASM_PATH = join(__dirname, '../../../artifacts/policy/policy.wasm').repla
 const MANIFEST_PATH = join(__dirname, '../../../artifacts/policy/manifest.json').replaceAll('\\', '/');
 const POLICY_FILE = join(__dirname, '../../../policies/agent-trust/decision.rego').replaceAll('\\', '/');
 
-/** Resolve the OPA CLI: OPA_BIN env → tools/bin → PATH. */
-function resolveOpaBin(): string {
+/** Resolve the OPA CLI: OPA_BIN env → tools/bin → PATH. undefined = absent. */
+function resolveOpaBin(): string | undefined {
   const envBin = process.env.OPA_BIN;
   if (envBin !== undefined && existsSync(envBin)) return envBin;
   const localName = process.platform === 'win32' ? 'opa.exe' : 'opa';
   const local = join(__dirname, '../../../tools/bin', localName);
   if (existsSync(local)) return local;
-  return 'opa'; // assume on PATH; spawn failure surfaces as a clear ENOENT
+  return undefined; // no binary in this checkout (fresh clone); CI always installs one
 }
 
 const OPA_BIN = resolveOpaBin();
+function opaOnPath(): boolean {
+  const probe = spawnSync('opa', ['version'], { stdio: 'ignore' });
+  return probe.error === undefined && probe.status === 0;
+}
+const OPA = OPA_BIN ?? 'opa';
+// Native<->Wasm parity requires the OPA CLI. A fresh clone has none (tools/bin
+// is gitignored; `pnpm setup:opa` installs the pinned build; CI installs it
+// system-wide), so the parity cases skip THERE with a loud warning — CI, which
+// always has the binary, still runs them as a hard gate. The committed Wasm
+// engine load + hash-pin check below always runs.
+const hasOpa = OPA_BIN !== undefined || opaOnPath();
+if (!hasOpa) {
+  console.warn(
+    '[wasm-parity] OPA CLI not found — native-parity cases skipped. ' +
+      'Run `pnpm setup:opa` to install the pinned binary. Wasm-engine load check still runs.',
+  );
+}
 
 function opaEvalStdin(input: unknown, timeoutMs = 30_000): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(OPA_BIN, ['eval', '--format=json', '-I', '-d', POLICY_FILE, 'data.agenttrust.decision']);
+    const child = spawn(OPA, ['eval', '--format=json', '-I', '-d', POLICY_FILE, 'data.agenttrust.decision']);
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
@@ -103,7 +120,7 @@ describe('native Rego ↔ Wasm parity (8M)', () => {
     },
   ];
 
-  it.each(corpus)('parity: $name', async ({ facts }) => {
+  it.skipIf(!hasOpa).each(corpus)('parity: $name', async ({ facts }) => {
     const native = await nativeDecision(facts);
     const wasmDecision = await engine.evaluate(facts);
     expect(wasmDecision.effect).toBe(native.effect);

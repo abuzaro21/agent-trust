@@ -12,9 +12,10 @@ const ROOT = import.meta.dirname ? join(import.meta.dirname, '..') : process.cwd
 const BIN_DIR = join(ROOT, 'tools', 'bin');
 
 const ASSETS = {
-  'win32-amd64': { name: 'opa_windows_amd64.exe', out: 'opa.exe' },
-  'linux-amd64': { name: 'opa_linux_amd64_static', out: 'opa' },
-  'darwin-amd64': { name: 'opa_darwin_amd64', out: 'opa' },
+  'win32-x64': { name: 'opa_windows_amd64.exe', out: 'opa.exe' },
+  'linux-x64': { name: 'opa_linux_amd64_static', out: 'opa' },
+  'linux-arm64': { name: 'opa_linux_arm64_static', out: 'opa' },
+  'darwin-x64': { name: 'opa_darwin_amd64', out: 'opa' },
   'darwin-arm64': { name: 'opa_darwin_arm64_static', out: 'opa' },
 };
 
