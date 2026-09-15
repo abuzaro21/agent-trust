@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "demo:e2e": "echo \"demo:e2e lands with the cross-agent E2E phase — see docs/roadmap.md build order step 10\""
   },
   "devDependencies": {

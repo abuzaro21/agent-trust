@@ -66,12 +66,22 @@ const BASE_TYPE = 'VerifiableCredential';
  *  5. issuer DID resolution                           → DID_RESOLUTION_FAILED
  *  6. kid belongs to the issuer DID                   → VC_ISSUER_KEY_MISMATCH
  *  7. signature over the received bytes               → VC_SIGNATURE_INVALID
+ *  7b. quarantine of the VERIFIED subject             → AGENT_QUARANTINED
  *  8. issuer trusted for this credential type          → UNTRUSTED_ISSUER
  *  9. validFrom / validUntil                          → VC_NOT_YET_VALID / VC_EXPIRED
  * 10. expected subject                                → WRONG_SUBJECT
  * 11. credential status (when declared)               → CREDENTIAL_REVOKED /
  *     (stage 2b, before all of the above,                CREDENTIAL_SUSPENDED /
- *      is the quarantine kill switch)                    CREDENTIAL_STATUS_UNAVAILABLE
+ *      is the quarantine kill switch on the              CREDENTIAL_STATUS_UNAVAILABLE
+ *      caller-attested actor: expectedSubject)
+ *
+ * Quarantine identity binding (hardened in the Step 7 pre-check): the
+ * early stage-2b check uses ONLY expectedSubject — an identity attested by
+ * the trusted caller — never the raw credential subject, which is
+ * attacker-chosen data until the signature verifies. The verified
+ * credential subject is checked at stage 7b, after stage 7 proved the
+ * signature. A forged credential therefore cannot learn or influence
+ * quarantine state for any identity.
  *
  * A valid signature alone never equals trust — stages 8–11 exist precisely
  * because stages 1–7 prove integrity, not acceptance.
@@ -121,10 +131,13 @@ export class CredentialVerifier {
       return deny('VC_SCHEMA_INVALID');
     }
 
-    // Stage 2b — emergency quarantine kill switch. Runs before anything
-    // else: a quarantined agent is blocked regardless of credential state.
-    if (this.#quarantineStore !== undefined) {
-      const quarantined = await this.#quarantineStore.isQuarantined(claims.sub);
+    // Stage 2b — emergency quarantine kill switch on the CALLER-ATTESTED
+    // actor. expectedSubject comes from trusted request context (e.g. the
+    // PoP-verified actor DID), so it is a legitimate early identity. The
+    // raw credential subject is unverified here and is deliberately NOT
+    // consulted until stage 7b.
+    if (this.#quarantineStore !== undefined && opts.expectedSubject !== undefined) {
+      const quarantined = await this.#quarantineStore.isQuarantined(opts.expectedSubject);
       if (quarantined) return deny('AGENT_QUARANTINED');
     }
 
@@ -157,6 +170,14 @@ export class CredentialVerifier {
     // Stage 7 — signature over the exact received bytes.
     if (!verifyCompactJwsSignature(parsed, method.publicKeyJwk as PublicJwk)) {
       return deny('VC_SIGNATURE_INVALID');
+    }
+
+    // Stage 7b — quarantine of the now CRYPTOGRAPHICALLY VERIFIED subject.
+    // The subject is signature-bound to the issuer at this point, so this
+    // decision no longer consumes attacker-chosen data.
+    if (this.#quarantineStore !== undefined) {
+      const quarantined = await this.#quarantineStore.isQuarantined(claims.sub);
+      if (quarantined) return deny('AGENT_QUARANTINED');
     }
 
     // Stage 8 — issuer trust for this credential type.

@@ -160,20 +160,24 @@ Requires Node 22+ (24 recommended). pnpm is provided via corepack:
 ```bash
 corepack enable
 pnpm install
-pnpm typecheck   # strict TS across the workspace
-pnpm test        # vitest across all packages
+pnpm typecheck          # strict TS across the workspace
+pnpm test               # vitest unit + property suite (no services needed)
+pnpm test:integration   # Redis-backed replay tests (needs TEST_REDIS_URL)
+docker compose up -d redis   # one-command dev Redis
+TEST_REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration
 ```
 
-Implemented packages (Phases 1–3 — contracts, crypto, DID, credentials, delegation, status):
+Implemented packages (Phases 1–4 — identity, credentials, delegation, status, replay):
 
 | Package | Contents |
 |---|---|
 | `@agent-trust/schemas` | JSON Schema contracts (draft 2020-12), TS types, closed reason-code enum, ajv validator |
 | `@agent-trust/crypto` | Frozen `Signer` interface, ES256 `LocalSigner`, RFC 8785 canonical JSON, DPoP-style proof-of-possession |
 | `@agent-trust/did` | `DidResolver` seam (ADR-0001), `did:key` P-256, `did:web` with timeout/injectable fetch, method registry |
-| `@agent-trust/vc` | Compact-JWS W3C VC 2.0 issuance/verification — 11-stage pipeline: structure → schema → type → issuer resolution → kid ownership → signature → issuer trust → validity window → subject → status. Quarantine kill switch runs before everything. |
+| `@agent-trust/vc` | Compact-JWS W3C VC 2.0 issuance/verification — 11-stage pipeline: structure → schema → type → issuer resolution → kid ownership → signature → issuer trust → validity window → subject → status. Quarantine kill switch on verified identities. |
 | `@agent-trust/delegation` | `Authority(child) ⊆ Authority(parent)` attenuator + chain walker with cycle detection, property-tested with fast-check |
 | `@agent-trust/status` | W3C Bitstring Status List (revocation = permanent, suspension = reversible), `StatusListManager` semantic mutations, signed status-list credentials reusing the VC stack, and the agent quarantine kill switch — all fail-closed |
+| `@agent-trust/replay` | Atomic CLAIM-ONCE replay protection (ADR-0003): in-memory store, Redis `SET NX PX` adapter, post-cryptography claim ordering (invalid proofs can never poison a jti), TTL derived from the proof lifetime, fail-closed on store outage |
 
 The project's own rule applies: **no UI before cross-agent E2E works** — a single `pnpm demo:e2e` must print that Agent A was accepted or rejected for the right reasons before any dashboard exists.
 

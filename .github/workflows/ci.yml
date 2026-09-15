@@ -1,7 +1,9 @@
 name: CI
 
 # Phase gate: grows per roadmap phase (docs/roadmap.md#ci-gates).
-# Current: repo integrity + typecheck + unit/contract tests + key-material scan.
+# Current: repo integrity + typecheck + unit/contract tests + Redis-backed
+# replay integration (real Redis via service container — no mocks) +
+# key-material scan.
 
 on:
   push:
@@ -10,8 +12,18 @@ on:
 
 jobs:
   gate:
-    name: Typecheck + tests + integrity
+    name: Typecheck + tests + Redis integration
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -28,8 +40,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Tests
+      - name: Tests (unit + property suite, no Redis required)
         run: pnpm test
+
+      - name: Redis integration tests (real Redis, SET NX PX atomicity)
+        run: pnpm test:integration
+        env:
+          TEST_REDIS_URL: redis://127.0.0.1:6379
 
       - name: Verify required documents exist
         run: |
