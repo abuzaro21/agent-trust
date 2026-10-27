@@ -9,7 +9,7 @@ import type { DidResolver } from '@agent-trust/did';
 import { validateDelegationChain } from '@agent-trust/delegation';
 import type { CredentialVerifier } from '@agent-trust/vc';
 import type { PolicyEngine } from '@agent-trust/policy';
-import { buildReceiptBody, resultDigestOf, type AuditLog, type ActionReceipt } from '@agent-trust/audit';
+import { buildReceiptBody, type AuditLog, type ActionReceipt } from '@agent-trust/audit';
 
 import type {
   ActionExecutor,
@@ -383,7 +383,8 @@ export class TrustGateway {
       },
       execution: {
         state: execution.state,
-        ...(execution.result !== undefined ? { resultDigest: resultDigestOf(execution.result) } : {}),
+        // The builder digests the result itself (a `resultDigest` key here was silently dropped).
+        ...(execution.result !== undefined ? { result: execution.result } : {}),
       },
       correlation: {
         taskId: task.taskId,
