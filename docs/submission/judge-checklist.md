@@ -31,7 +31,7 @@ Nothing vague; every row is clickable or runnable.
 | Dimension | Best evidence |
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
-| **Technical depth (25)** | 480 core + 45 frontend + 5 integration tests (480 requires OPA on PATH) · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Technical depth (25)** | 480 tests in the default run (435 package + 45 apps/web; OPA on PATH needed for all 480) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
 | **Demo quality (20)** | Live dashboard: presets, pipeline view, receipts, profile, DID badges; 5 screenshots at 1440×900; Loom script (once recorded on public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
@@ -40,7 +40,7 @@ Nothing vague; every row is clickable or runnable.
 
 | Item | Status |
 |---|---|
-| Typecheck, 480 unit, 45 frontend, 5 Redis, 13 OPA, 60/60 attacks, build | PASS on the release branch (see `final-submission.md`) |
+| Typecheck, 480 tests (incl. the 45 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build | PASS on the release branch (see `final-submission.md`) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
 | `smoke:live` 45/45 | NOT RUN on the release build (needs keys + public URL) |
 | Public HTTPS URL, 90-second walkthrough | BLOCKER — not produced |

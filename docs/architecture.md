@@ -101,6 +101,7 @@ Runs before policy; produces **verified facts**, not opinions:
 ```text
 resolve DID
 → prove key possession
+→ claim request nonce/JTI (atomic; right after PoP, before credential work)
 → verify VC signature
 → validate schema/type
 → validate issuer trust
@@ -109,7 +110,6 @@ resolve DID
 → check revocation
 → verify parent delegation chain
 → enforce attenuation
-→ validate request nonce/JTI (atomic)
 → build verified evidence
 ```
 

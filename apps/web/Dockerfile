@@ -39,8 +39,9 @@ COPY artifacts ./artifacts
 COPY apps/web ./apps/web
 COPY scripts ./scripts
 # Deterministic attack report baked in — the dashboard serves this artifact
-# instead of running the 60-scenario suite on page load.
-RUN pnpm demo:attacks
+# instead of running the 60-scenario suite on page load. test:attacks exits
+# non-zero on any failed scenario, so a regression fails the image build.
+RUN pnpm test:attacks
 RUN pnpm build:web
 
 # ---- runtime: standalone server + repo-root artifacts ------------------------

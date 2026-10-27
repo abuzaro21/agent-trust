@@ -19,7 +19,7 @@ export const DID_OUT_DIR = join(ROOT, '.local', 'did-host');
 
 /** The two demo identities — each gets its OWN key. */
 export const DEMO_AGENTS = [
-  { name: 'org', path: 'org' },
+  { name: 'org', path: 'agents/org' },
   { name: 'support', path: 'agents/support' },
   { name: 'refund', path: 'agents/refund' },
 ];

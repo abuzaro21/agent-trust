@@ -36,8 +36,9 @@ Live Demo URL:       PENDING HOSTING ACCOUNT — see SUBMISSION BLOCKER above.
                        cd agent-trust
                        docker compose -f docker-compose.demo.yml up --build
                        → http://localhost:3000
-                     (identical configuration verified public-identity mode;
-                      public did:web identities below are live RIGHT NOW)
+                     (the quickstart runs fixture identities; the live overlay
+                      adds real did:web identities, see docs/deployment.md.
+                      The public did:web identities below resolve RIGHT NOW)
 
 Walkthrough URL:     PENDING RECORDING (script ready: loom-script.md)
 
@@ -113,8 +114,8 @@ are from those runs; historical counts from the original freeze are not reused.
 
 ```text
 TypeScript typecheck       0 errors
-unit/property tests        480 passed (needs OPA on PATH; 415 pass + 10 skip without it)
-frontend/API tests         45 passed
+default `pnpm test`        480 passed (435 package + 45 apps/web; 470 pass + 10 skip without OPA)
+frontend/API subset        45 passed (`pnpm test:frontend`, already inside the 480)
 redis integration          5/5 (Redis 7)
 OPA native tests           13/13
 adversarial suite          60/60 (52 attacks + 8 failure demos)

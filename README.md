@@ -8,8 +8,9 @@
 
 > **Walkthrough: recording pending** (script timed and ready:
 > [docs/submission/loom-script.md](docs/submission/loom-script.md)).
-> The interactive demo (real `did:web` identities + Redis-backed replay + the
-> full gateway) runs from one command — see Quickstart below. A public hosted
+> The interactive demo (full gateway + Redis-backed replay; the Quickstart runs it
+> with local **fixture** identities — real `did:web` identities need the live overlay
+> and secrets described in [docs/deployment.md](docs/deployment.md)) runs from one command. A public hosted
 > URL is pending a hosting-provider account; everything needed to deploy it is
 > committed. The 45-check live smoke suite passed in an earlier local rehearsal
 > against the public identities and must be re-run against the public URL once
@@ -34,8 +35,8 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
   "Challenge Demo · simulation, not a payment system".
 - **The agents are server-owned fixtures.** The public API signs custom requests as the demo
   SupportAgent; it demonstrates the trust pipeline, it does not authenticate external callers.
-  Presets such as *Replay* and *Revoked* run both requests server-side (the revoked preset uses an
-  isolated credential so the primary one stays valid).
+  The *Replay* preset sends the identical signed request twice from the server; the *Revoked* preset revokes a separate isolated
+  credential and submits it once, so the primary credential stays valid.
 - **The demo clock is frozen** at `2026-09-15T12:00:00Z` (shown by `GET /api/demo/status`), so
   results and receipt timestamps are deterministic; real wall-clock expiry is covered by the tests.
 - **State is process-local.** Audit receipts, status lists and profile evidence live in memory and
@@ -126,7 +127,7 @@ And the invariant that makes the model coherent:
 
 - **The LLM never decides its own permissions.** An agent runtime may *propose* a tool call, but every request passes through an independent, deterministic enforcement point. Prompt injection cannot alter a Verifiable Credential or a Rego policy.
 - **Compromised keys are assumed possible.** No cryptography detects an attacker who holds the *valid* private key — so the design limits the blast radius instead: narrow scopes, per-credential amount caps, audience binding, bounded credential & proof lifetimes, revocation, and an emergency quarantine switch. (Not in P0: `limits.perDay` is accepted by the credential schema but **not enforced**, and human-in-the-loop approval is a P1 target — the P0 policy never returns `REQUIRE_APPROVAL`.)
-- **Fail closed.** Missing/invalid policy bundle, policy-engine failure, unavailable replay store on a write action, audit-log failure, signature-verifier errors — all deny, and the protected action never runs. There is no permissive fallback. One honest nuance: when the policy *engine itself* throws, the denial stands but **no decision receipt is written** (the receipt schema requires a real policy hash, which an engine that failed cannot supply).
+- **Fail closed.** Missing/invalid policy bundle, policy-engine failure, unavailable replay store on a write action, signature-verifier errors, and failure to persist the *decision* receipt — all deny, and the protected action never runs. (If the *outcome* receipt cannot be written after a successful execution, the result is `EXECUTION_UNCERTAIN`: the effect ran, the audit trail is incomplete, and the side effect is not retried.) There is no permissive fallback. One honest nuance: when the policy *engine itself* throws, the denial stands but **no decision receipt is written** (the receipt schema requires a real policy hash, which an engine that failed cannot supply).
 
 ## Demo Scenario
 
@@ -210,7 +211,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 480 unit/property tests (with OPA on PATH — without it 10 native-parity cases skip), 45 frontend/API tests, 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: the public HTTPS dashboard URL (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)) and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 480 tests in the default `pnpm test` run (435 package tests + the 45 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 470 pass and 10 native-parity cases skip), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: the public HTTPS dashboard URL (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)) and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|
@@ -311,9 +312,10 @@ DEMO_PUBLIC_URL=https://<host> pnpm smoke:live   # 45 checks: public DIDs,
                                                   # judge scenarios, leak scans
 ```
 
-No private keys, signer material, or Redis credentials ever leave the server
+No private keys, signer material, or Redis credentials are meant to leave the server
 process: the browser receives sanitized DTOs only, response-shape tests
-enforce that, and `smoke:live` re-scans the deployed API + HTML + JS bundles.
+enforce that, and `smoke:live` scans the JSON responses it fetches, the HTML shell and up to 12 JS bundles
+(a best-effort scan, not proof of absence).
 
 ## Architecture: the authorized path
 

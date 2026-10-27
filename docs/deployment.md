@@ -72,7 +72,7 @@ Production evolution would move audit/demo state to a transactional store
 docker build -t agent-trust-demo -f apps/web/Dockerfile .
 # 2) one app replica + external redis; secrets via the platform secret store
 #    (env-file example below is LOCAL REHEARSAL only — .local/ is gitignored)
-docker run -d -p 3000:3000 --env-file ./live.secrets.env agent-trust-demo
+docker run -d -p 3000:3000 --env-file ./.local/live.secrets.env agent-trust-demo
 # 3) verify exactly what a judge will experience
 DEMO_PUBLIC_URL=https://<host> pnpm smoke:live
 ```
@@ -112,7 +112,7 @@ Fly/railwall) if the host provides them.
 Server logs carry only taskId/reasonCode/receiptId/build SHA and transport
 errors. No private JWK JSON, no Redis URLs/credentials, no environment dumps
 are logged anywhere in the request path; the smoke's leak-scan step proves
-nothing secret reaches HTTP responses or browser bundles either.
+nothing secret reaches the responses it fetches, the HTML shell or the (up to 12) JS bundles it can download — a best-effort scan, not a proof of absence.
 
 ## Hosting requirements (measured / derived)
 
@@ -130,11 +130,12 @@ nothing secret reaches HTTP responses or browser bundles either.
   `DEMO_REFUND_KEY_JSON` (private JWKs), `DEMO_REDIS_URL` (may contain credentials).
 - Source of the keys: `pnpm demo:did:init` writes them to `.local/demo-keys/` (gitignored). They must be the **same**
   keys whose public halves are published in the `did.json` files — a mismatch makes the live resolver reject the identities.
-- Load them from a gitignored env file through the provider's import mechanism (for Fly: `fly secrets import < .local/live.secrets.env`)
+- Keep the env file ONLY under `.local/` (gitignored and excluded from Docker contexts) — any other filename may be committed or copied into an image. Load it through the provider's import mechanism (for Fly: `fly secrets import < .local/live.secrets.env`)
   rather than typing values on the command line or into shell history.
 - A public `did.json` must contain no `d` member; `smoke:live` scans responses, HTML and JS bundles for key material.
-- Rotation / suspected exposure: run `demo:did:init`, republish the new `did.json` files, import the new secrets, redeploy;
-  the resolver caches at most 10 minutes, so rotation propagates within that window.
+- Rotation / suspected exposure: `demo:did:init` **reuses** an existing `.local/demo-keys/<name>.key.json`, so first delete (or move
+  away) the key file of every affected identity, then run `demo:did:init` to mint replacements, republish the new `did.json` files,
+  import the new secrets and redeploy. The resolver caches at most 10 minutes, so rotation propagates within that window.
 
 ## Release deployment procedure
 
@@ -144,10 +145,10 @@ nothing secret reaches HTTP responses or browser bundles either.
    Keep `[http_service] min_machines_running = 1`, `auto_stop_machines = "off"`, and a single machine.
 3. **Redis:** create a managed Redis ≥ 6; take its URL (a secret).
 4. **Secrets:** import `DEMO_REDIS_URL`, the three `DEMO_*_KEY_JSON` and `DEMO_BUILD_SHA=<SHA>` from the gitignored env file.
-5. **Deploy:** `fly deploy` (builds `apps/web/Dockerfile`; the image runs `demo:attacks` and `build:web` at build time).
+5. **Deploy:** `fly deploy` (builds `apps/web/Dockerfile`; the image runs `test:attacks` — which fails the build on any failed scenario — and `build:web`). Then `fly scale count 1` and confirm `fly status` shows exactly one machine.
 6. **Verify outside-in (all must pass before recording anything):**
    - `curl -s https://<host>/api/health` → `status: ok`, `identityMode: web`, `build.sha` = `<SHA>`.
-   - `curl -s https://<host>/api/demo/status` → `identityMode: web`, `replayStore: redis`.
+   - `curl -s https://<host>/api/demo/status` → HTTP 200 with `identityMode: web`, `replayStore: redis`. (`/api/health` is **liveness only** — it does not load keys, Redis or the policy; `/api/demo/status` builds the world and is the readiness check. A misconfigured key/Redis/DID host fails at this request, not at process start.)
    - `curl -s -o /dev/null -w '%{http_code}' https://abuzaro21.github.io/agents/{org,support,refund}/did.json` → `200` each.
    - `DEMO_PUBLIC_URL=https://<host> pnpm smoke:live` → the documented 45 checks, **zero FAIL** (any FAIL blocks submission).
    - Click through the 8 presets and `/attacks` once by hand.
@@ -180,13 +181,13 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Unit/property tests with OPA on PATH | PASS — 480/480 (46 files) |
-| Frontend/API tests | PASS — 45/45 (5 files) |
+| Default `pnpm test` (OPA on PATH) | PASS — 480/480 in 46 files (435 package tests + the 45 `apps/web` tests); without OPA: 470 pass + 10 skipped |
+| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 45/45 (5 files) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
 | OPA fmt / check / test | PASS — 13/13 |
 | Adversarial suite | PASS — 60/60 (52 attacks + 8 failure demos) |
 | Production web build | PASS |
-| Docker image build (`apps/web/Dockerfile`) | PASS — 330 MB |
+| Docker image build (`apps/web/Dockerfile`) | PASS — 330 MB; the build now runs `test:attacks` (60/60 inside the image) so a failed scenario fails the build |
 | Compose demo (`docker-compose.demo.yml` + Redis 7) | PASS — started on a free host port (3000 was occupied by an unrelated local container, which was not touched); `/api/health` ok, `replayStore: redis` |
 | Demo presets (8) against the container | PASS — same reason codes as documented |
 | Malformed-input exploit (`amount` −5 / 0 / "abc", `currency` "SARX") against the container | PASS — `REQUEST_MALFORMED`, no receipt, audit `chain.valid: true` |

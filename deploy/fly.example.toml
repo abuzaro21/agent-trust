@@ -29,8 +29,10 @@ primary_region = "fra"
 
 # P0 requires exactly ONE app replica: audit/demo/profile state is
 # process-local (rebuilt deterministically at startup); only replay state
-# is external (Redis). Horizontal scaling is deliberately pinned — do not
-# raise max_machines while authoritative demo state is process-local.
+# is external (Redis). This file only sets a MINIMUM of one machine — after
+# deploy, run `fly scale count 1` and confirm `fly status` shows one machine.
+# Do not add machines while authoritative demo state is process-local.
+# /api/health is liveness only; readiness is /api/demo/status (docs/deployment.md).
 [http_service]
   internal_port = 3000
   force_https = true
