@@ -34,14 +34,15 @@ asserts the expected reason code in the DOM after each click and aborts if it di
 
 1. **Capture** (Sonnet orchestrates; Haiku executes)
    - `puppeteer-core` (already a dev dependency) driving `C:\Program Files\Google\Chrome\Application\chrome.exe`
-     headless, viewport 1920×1080, deviceScaleFactor 1, `--hide-scrollbars`, no address bar in frame.
+     headless, viewport 1920×1080, deviceScaleFactor 1, `--hide-scrollbars`. Headless has no cursor and no address bar: add a lower-third showing the public HTTPS URL (Opus review; the earlier plan to hide the address bar was dropped) and a standing caption "executor simulated · demo clock 2026-09-15".
+   - Re-time CDP frames to a steady 30 fps from their timestamps and capture PNG/quality 100 so reason codes stay sharp.
    - Record each segment with `page.screencast` if the installed puppeteer-core supports it (needs `ffmpeg` on PATH — present, 9.0.2); fallback:
      CDP `Page.startScreencast` frames → ffmpeg.
    - Per segment: click the real preset button, wait for the result element, assert text (table below),
      hold 1.5 s, write a JSON log `{segment, startedAt, apiResponse, domAssertion}`.
-   - Start from a fresh container restart so the audit panel begins at zero receipts.
+   - Start from a freshly started **private** instance of the same SHA so the audit panel begins at zero receipts (do not restart the public demo while judges may be using it). Record `/api/health` `build.sha` in the capture log.
    - Never type or display secrets, tokens, `.local` paths or terminals.
-2. **Narration** — English, from `loom-script.md` (192 tokens ≈ 79 s). Method: Kokoro TTS through
+2. **Narration** — English, from `loom-script.md` (167 tokens ≈ 67 s). Method: Kokoro TTS through
    Hyperframes (Brag's `--voice` path), one WAV per segment; measure each duration; if a segment overruns its
    window trim words, not scenes. Pronunciation lexicon: `did:web` → "D-I-D web", `SAR` → "S-A-R",
    `ALLOW`/`DENY` as words, `OPA` is not narrated.
@@ -49,28 +50,31 @@ asserts the expected reason code in the DOM after each click and aborts if it di
    - Layers: real footage → zoom/crop moves (scale + translate only) → highlight boxes at measured
      coordinates → lower-third captions → burned subtitles → title/end cards.
    - Visual identity = the real dashboard: dark navy, mono reason codes, green ALLOW / red DENY.
-4. **Audio** — voice on top; music ducked ≥ 18 dB under voice; UI-click SFX optional.
+4. **Audio** — voice only by default. **No music and no click SFX** (music licence unverified; scripted clicks sound fake). If a licensed track is later approved: duck ≥ 18 dB under voice. Resample Kokoro's 24 kHz output to 48 kHz.
 5. **Render** — Hyperframes → MP4; then `ffmpeg` pass for `+faststart` and loudness.
 6. **Validate** (all must pass; record results in `docs/submission/video-qa.md`)
    - `ffprobe`: 1920×1080, 30 fps, H.264, AAC, duration 85–90 s.
    - Loudness −16 ±2 LUFS integrated, true peak ≤ −1 dBTP; no clipping.
    - Sample a frame at each segment's result time; reason code readable and equal to the capture log.
+   - Per segment: narration WAV length ≤ window − 1.5 s (not only total duration).
+   - No stale result from the previous beat visible when the next beat starts.
    - Subtitles: ≤ 2 lines, ≤ 42 chars/line, in sync ±150 ms with narration.
    - Frame scan for secrets: no key material, no `localhost`, no terminal, no private paths.
-   - Claim table below signed off by Codex (read-only) against the capture log and source.
+   - Claim table **and the narration text itself** reviewed by Codex (read-only) against the capture log and source.
+   - SHA-256 of the final MP4 and SRT recorded in `video-qa.md`.
 
 ## Segment plan (90 s) — narration is in `loom-script.md`
 
 | Time | Real action | DOM/API assertion before moving on | On-screen text (caption) |
 |---|---|---|---|
 | 0:00–0:08 | Open `/`; hold on Trust Profile | Profile shows DID `…agents:support`, "no score" statement | "Who an agent is ≠ what it may do" |
-| 0:08–0:18 | Cursor traces DID, `≤ 500 SAR`, attestations | Authority box shows `≤ 500 SAR` | "Evidence, not a score" |
+| 0:08–0:18 | Highlight boxes (DOM-placed, disclosed overlay) step through DID, `≤ 500 SAR`, attestations | Authority box shows `≤ 500 SAR` | "Evidence, not a score" |
 | 0:18–0:35 | Click **Valid 120 SAR** | outcome AUTHORIZED, effect ALLOW, execution SUCCEEDED | "120 SAR → ALLOW (simulated refund)" |
 | 0:35–0:50 | Click **Over-limit 5000 SAR** | `AUTHORITY_LIMIT_EXCEEDED`, execution NOT_RUN | "5000 SAR → DENY: trusted, not for this action" |
 | 0:50–1:00 | Click **Spoofed Agent** | `IDENTITY_PROOF_INVALID`, policy NOT_RUN | "Spoof → DENY" |
 | 1:00–1:10 | Click **Revoked Credential** | `CREDENTIAL_REVOKED` | "Revoked → DENY" |
-| 1:10–1:20 | Click **Replay Attack** | first AUTHORIZED, second `REPLAY_DETECTED` | "Replay → DENY" |
-| 1:20–1:30 | Navigate to `/attacks`; hold on banner; back to `/` | banner reads 60/60 | "60 adversarial scenarios" · repo URL |
+| 1:10–1:18 | Click **Replay Attack** | first AUTHORIZED, second `REPLAY_DETECTED` | "Replay → DENY" |
+| 1:18–1:30 | Navigate to `/attacks`; hold on banner (52 attacks + 8 failure demos); back to `/` | banner reads 60/60 | "60 security scenarios" · repo URL |
 
 ## Claims that may be narrated (and their evidence)
 
@@ -110,7 +114,7 @@ asserts the expected reason code in the DOM after each click and aborts if it di
 
 ## Model routing
 
-Opus 5.5 reviewed this concept once (narration + visuals). Sonnet 5.5 orchestrates and owns quality gates.
+Opus 5.5 reviewed this concept once (narration + visuals); its accuracy fixes (gate order, isolated revoked credential, replay framing, "52 attacks + 8 failure demos", "signed, hash-chained history") are applied in `loom-script.md`. Disagreement preserved: Opus recommends showing the public URL, `did:web` JSON loading and an audit-verify result as extra trust evidence; the plan adopts the URL lower-third and standing caption, and leaves the extra inserts optional because they add scenes beyond the 90 s budget. Opus also advised against music, SFX and drawn cursors — adopted. Sonnet 5.5 orchestrates and owns quality gates.
 Haiku 5.5 executes capture/compose/render. Codex GPT-6.1 Sol verifies narrated claims (read-only).
 One delegate at a time; at most one corrected retry per task.
 
