@@ -1,8 +1,21 @@
 **/node_modules
 **/.next
 .git
-.local
 coverage
 *.log
 tools/bin
 artifacts/attacks
+
+# Secrets and local identity material must never enter the build context
+# (mirrors .gitignore). artifacts/policy is deliberately NOT excluded: the
+# hash-pinned policy.wasm + manifest are required by the image.
+.local
+**/.local
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/keys
+**/secrets

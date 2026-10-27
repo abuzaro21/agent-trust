@@ -6,8 +6,8 @@ import type { AttackReportDto, AttackScenarioDto } from '@/lib/dto';
 
 /**
  * /attacks — the Step 13 adversarial suite rendered from the generated
- * report (or an explicit run). Loads a snapshot by default; the full
- * suite NEVER auto-runs on page load (14O).
+ * report artifact. The page only reads the snapshot; it never triggers a
+ * server-side suite run (the API serves the build-time artifact only).
  */
 
 const SHOWCASE = ['AUTHORITY-001', 'IDENTITY-001', 'STATUS-001', 'REPLAY-001', 'AUDIT-007', 'ATTEST-002'];
@@ -18,11 +18,11 @@ export default function AttacksPage() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState<string | null>('AUTHORITY-001');
 
-  const load = async (run = false) => {
+  const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(run ? '/api/attacks/report?run=1' : '/api/attacks/report');
+      const res = await fetch('/api/attacks/report');
       const json = await res.json();
       if (!res.ok || json.error !== undefined) {
         setError(`${json.error ?? 'ATTACK_REPORT_UNAVAILABLE'}${json.detail ? `: ${json.detail}` : ''}`);
@@ -37,7 +37,7 @@ export default function AttacksPage() {
   };
 
   useEffect(() => {
-    void load(false);
+    void load();
   }, []);
 
   const scenarios = useMemo(() => report?.scenarios ?? [], [report]);
@@ -54,11 +54,11 @@ export default function AttacksPage() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <a href="/" className="badge badge--neutral" style={{ textDecoration: 'none' }}>← Trust console</a>
           <button
-            onClick={() => void load(true)}
+            onClick={() => void load()}
             disabled={loading}
             style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--border-strong)', background: 'var(--surface-raised)', color: 'var(--fg)', opacity: loading ? 0.6 : 1 }}
           >
-            {loading ? 'Running suite…' : 'Run full suite'}
+            {loading ? 'Loading…' : 'Reload report'}
           </button>
         </div>
       </header>
@@ -70,7 +70,6 @@ export default function AttacksPage() {
       )}
 
       {report === null && error === null && !loading && <p style={{ color: 'var(--fg-subtle)' }}>Loading report…</p>}
-      {loading && <p style={{ color: 'var(--fg-subtle)' }}>Running all scenarios (isolated worlds, ~4 s)…</p>}
 
       {report !== null && (
         <>
