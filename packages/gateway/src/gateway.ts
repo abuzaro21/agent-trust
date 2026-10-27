@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import { GATEWAY_HTU, taskContent } from './request.js';
 import { buildDelegationChain, buildVerifiedFacts, selectCredentials } from './credentials.js';
+import { validateActionParameters } from './parameters.js';
 
 /**
  * TrustGateway (Step 10) — the composition boundary. The agent/LLM runtime
@@ -106,6 +107,10 @@ export class TrustGateway {
       credentials: string[];
       proof: AgentProof;
     };
+    const parameterProblem = validateActionParameters(task.action, task.parameters);
+    if (parameterProblem !== undefined) {
+      return denied('REQUEST_MALFORMED', stages, parameterProblem);
+    }
 
     // ---- 2. PoP / identity (crypto first; NO replay claim yet) -------------
     stages.identity = 'FAIL';

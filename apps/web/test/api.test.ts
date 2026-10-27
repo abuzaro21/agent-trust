@@ -133,3 +133,26 @@ describe('profile + audit APIs', () => {
     expect(Array.isArray(json.receipts)).toBe(true);
   });
 });
+
+describe('audit-chain poisoning via the public API (regression)', () => {
+  it.each([
+    ['negative amount', { amount: -5 }],
+    ['zero amount', { amount: 0 }],
+    ['string amount', { amount: 'abc' }],
+    ['lowercase currency', { currency: 'sar' }],
+    ['oversized currency', { currency: 'SARX' }],
+  ])('%s is denied REQUEST_MALFORMED and the audit chain stays valid', async (_label, body) => {
+    const { status, json } = await postCustom(body);
+    expect(status).toBe(200);
+    expect(json.result.effect).toBe('DENY');
+    expect(json.result.reasonCodes).toEqual(['REQUEST_MALFORMED']);
+    expect(json.result.stages.execution).toBe('NOT_RUN');
+    expect(json.runReceipts).toEqual([]);
+    const res = await getAudit(new Request('http://localhost/api/audit/acme-demo'), {
+      params: Promise.resolve({ streamId: 'acme-demo' }),
+    });
+    const audit = await res.json();
+    expect(audit.chain.valid).toBe(true);
+    expect(audit.checkpoint.signatureValid).toBe(true);
+  });
+});

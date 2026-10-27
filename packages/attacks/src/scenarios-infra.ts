@@ -94,7 +94,7 @@ export const INFRA_004: AttackScenario = {
   id: 'INFRA-004',
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
-  title: 'OPA engine crash inside evaluate — fail closed with a denial receipt',
+  title: 'OPA engine crash inside evaluate — fail closed (no receipt: policy identity unknown; chain stays valid)',
   expected: { outcome: 'DENY, executor untouched', reasonCode: 'POLICY_EVALUATION_ERROR' },
   async run() {
     const w = await buildAttackWorld();
