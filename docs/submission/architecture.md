@@ -48,6 +48,13 @@ Three load-bearing properties:
    5000 SAR is denied `AUTHORITY_LIMIT_EXCEEDED` in the same minute.
 3. **Every dependency fails closed** — resolver, status, replay, policy,
    audit: an unavailable check denies; there is no permissive fallback.
+   (If the policy engine itself crashes the request is denied and nothing
+   executes, but no receipt is written.)
+
+P0 as built: one Next.js app composes these packages in-process; the gateway
+accepts a single delegation link, state is in-memory (replay claims in Redis),
+the demo clock is frozen at 2026-09-15T12:00:00Z, and the executor is a
+simulation.
 
 Implementation map: `packages/did · vc · status · delegation · replay ·
 policy · gateway · audit · trust-profile · attacks` · `apps/web` (view only).

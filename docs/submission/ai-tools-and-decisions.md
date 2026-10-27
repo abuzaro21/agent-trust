@@ -30,6 +30,27 @@ running the 60-scenario suite on page load (14O violation — served the
 baked artifact instead), and an in-memory replay fallback when Redis was
 configured but unreachable (16H violation — startup now fails).
 
+## Independent post-freeze review (October 2026)
+
+After the 17-step build was frozen, a second audit was run with different
+tools: Claude Sonnet 5.5 orchestrated; **OpenAI Codex GPT-6.1 Sol** performed a
+read-only code audit (and later a read-only review of the repair commits);
+**Claude Opus 5.5** was consulted once to challenge the audit's conclusions.
+Findings were re-verified against the source before being acted on, and the
+reviewers disagreed in places (documented, not forced into agreement).
+
+| Defect in the AI-written implementation | How it was found | Resolution |
+|---|---|---|
+| **Audit-chain poisoning** — a request such as `amount:-5` was denied, but the denial receipt carried the invalid amount; the log accepted it and chain verification failed afterwards, so one request could turn the audit view red until restart | Opus follow-up probe, reproduced with one `curl` | Parameters gate in the gateway + receipt schema validation before append; 29 regression tests (22 gateway, 2 audit-log, 5 API) |
+| **Authority window dropped** — `validFrom/validUntil` never reached the policy facts, so expired/not-yet-valid authority was allowed | Codex audit, reproduced against the real Wasm | Window passed through from the signed credential; tests for both bounds |
+| **Concurrent revocation lost update** — two simultaneous revokes could undo one another | Codex audit, reproduced | Per-list serialization (single-process only) |
+| **Result digest silently dropped** from outcome receipts | Codex audit | Result passed to the receipt builder; tamper test |
+| **Public suite trigger** — `?run=1` ran the 60-scenario suite per unauthenticated call | Opus review | Route serves the build artifact only |
+| **Documentation drift** — test counts, "amount/day caps", human-in-the-loop, target-vs-built architecture, and a 90-second script whose narration was ~102 s, not 87 s | Claim-to-code matrix | Corrected in this package |
+
+Not fixed (listed in the threat model): status-list rollback, `perDay`
+enforcement, DID key-purpose checks, multi-hop through the gateway.
+
 ## Major engineering decisions
 
 - **did:web for P0 identities, did:key only for test fixtures.** did:web

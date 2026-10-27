@@ -11,9 +11,9 @@
 > The interactive demo (real `did:web` identities + Redis-backed replay + the
 > full gateway) runs from one command — see Quickstart below. A public hosted
 > URL is pending a hosting-provider account; everything needed to deploy it is
-> committed and pre-verified with the live smoke suite (45/45) against the
-> public identities. The demo UI is shown below exactly as the deployed
-> rehearsal renders it.
+> committed. The 45-check live smoke suite passed in an earlier local rehearsal
+> against the public identities and must be re-run against the public URL once
+> it exists. The screenshots below come from that earlier rehearsal.
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
@@ -27,6 +27,21 @@
 
 The second row is the thesis: the agent was not "less trusted" — the *action*
 left the scope of its authority. Deterministic policy, not reputation, decides.
+
+### What this demo is — and is not
+
+- **The executor is a simulation.** `DemoRefundExecutor` moves no money; the dashboard says
+  "Challenge Demo · simulation, not a payment system".
+- **The agents are server-owned fixtures.** The public API signs custom requests as the demo
+  SupportAgent; it demonstrates the trust pipeline, it does not authenticate external callers.
+  Presets such as *Replay* and *Revoked* run both requests server-side (the revoked preset uses an
+  isolated credential so the primary one stays valid).
+- **The demo clock is frozen** at `2026-09-15T12:00:00Z` (shown by `GET /api/demo/status`), so
+  results and receipt timestamps are deterministic; real wall-clock expiry is covered by the tests.
+- **State is process-local.** Audit receipts, status lists and profile evidence live in memory and
+  reset on restart (single replica); only replay claims are externalized to Redis.
+- **The gateway accepts a single delegation link.** Multi-hop chains are verified and attenuated
+  in `packages/delegation` (tested directly) but are not presentable through the gateway in P0.
 
 **60/60 adversarial security scenarios pass** at image build time (see the
 [Security Tests view](docs/screenshots/05-security-tests.png)): identity
@@ -75,9 +90,9 @@ Context + Provenance + Attestations
    ↓
 Embedded Rego Policy Engine (OPA Wasm)
    ↓
-ALLOW / DENY / REQUIRE_APPROVAL
+ALLOW / DENY  (REQUIRE_APPROVAL is a P1 contract — never returned by the P0 policy)
    ↓
-Enterprise Action
+Simulated enterprise action (DemoRefundExecutor)
    ↓
 Tamper-evident Action Receipt
 ```
@@ -90,7 +105,7 @@ Tamper-evident Action Receipt
 | Who granted its authority? | W3C Verifiable Credentials 2.0 (JWS/ES256) from issuers listed in a **Trusted Issuer Registry** |
 | What are the limits? | Scoped actions/resources, amount & time caps, strict **delegation attenuation** (`Authority(child) ⊆ Authority(parent)`) |
 | Is it still valid? | W3C Bitstring Status List revocation + emergency quarantine |
-| Is *this* action acceptable *now*? | Rego policies compiled to **OPA Wasm, embedded in the service process** — deterministic `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with reason codes |
+| Is *this* action acceptable *now*? | Rego policies compiled to **OPA Wasm, embedded in the service process** — deterministic `ALLOW` / `DENY` with reason codes (`REQUIRE_APPROVAL` exists in the schema but is not produced by the P0 policy) |
 | What actually happened? | Tamper-evident, hash-chained **Action Receipts** with signed checkpoints |
 
 ## The Sentence That Leads This Project
@@ -110,8 +125,8 @@ And the invariant that makes the model coherent:
 ## Security Stance
 
 - **The LLM never decides its own permissions.** An agent runtime may *propose* a tool call, but every request passes through an independent, deterministic enforcement point. Prompt injection cannot alter a Verifiable Credential or a Rego policy.
-- **Compromised keys are assumed possible.** No cryptography detects an attacker who holds the *valid* private key — so the design limits the blast radius instead: narrow scopes, amount/day caps, audience binding, short credential & proof lifetimes, human-in-the-loop for high-risk actions, revocation, and an emergency quarantine switch.
-- **Fail closed.** Missing/invalid policy bundle, unavailable replay store on a write action, audit-log failure, signature-verifier errors — all deny. There is no permissive fallback anywhere.
+- **Compromised keys are assumed possible.** No cryptography detects an attacker who holds the *valid* private key — so the design limits the blast radius instead: narrow scopes, per-credential amount caps, audience binding, bounded credential & proof lifetimes, revocation, and an emergency quarantine switch. (Not in P0: `limits.perDay` is accepted by the credential schema but **not enforced**, and human-in-the-loop approval is a P1 target — the P0 policy never returns `REQUIRE_APPROVAL`.)
+- **Fail closed.** Missing/invalid policy bundle, policy-engine failure, unavailable replay store on a write action, audit-log failure, signature-verifier errors — all deny, and the protected action never runs. There is no permissive fallback. One honest nuance: when the policy *engine itself* throws, the denial stands but **no decision receipt is written** (the receipt schema requires a real policy hash, which an engine that failed cannot supply).
 
 ## Demo Scenario
 
@@ -149,8 +164,8 @@ flowchart LR
     ENFORCE --> REPLAY[Replay Store<br/>Redis SET NX EX]
     ENFORCE --> EVID[Trust Evidence Builder]
     EVID -->|Verified facts + request context| OPA[Embedded OPA Wasm<br/>Compiled Rego]
-    OPA -->|ALLOW| B[Agent B / Enterprise API]
-    OPA -->|REQUIRE_APPROVAL| HITL[Human Approval]
+    OPA -->|ALLOW| B[Simulated executor<br/>DemoRefundExecutor]
+    OPA -.->|REQUIRE_APPROVAL<br/>P1 — not implemented| HITL[Human Approval]
     OPA -->|DENY + reasons| ENFORCE
     B --> LOG[Hash-chained Action Receipts]
     ENFORCE --> LOG
@@ -166,35 +181,41 @@ Full details: [docs/architecture.md](docs/architecture.md) · [threat model](doc
 ```text
 agent-trust/
 ├── apps/
-│   ├── web/                  # Next.js demo & operations UI
-│   ├── trust-gateway/        # Fastify + embedded OPA Wasm — the enforcement core
-│   ├── credential-service/   # Issuance, revocation, trusted-issuer registry
-│   ├── agent-alpha/          # Demo agent A (CustomerSupportAgent)
-│   └── agent-beta/           # Demo agent B (PaymentAgent)
-├── packages/
-│   ├── crypto/               # Signer abstraction (local / KMS)
-│   ├── did/                  # Resolver abstraction + did:web, did:key, did:webvh adapters
+│   └── web/                  # Next.js demo & operations UI — the ONLY running app; composes the packages below in-process
+├── packages/                 # implemented, tested libraries (the real trust fabric)
+│   ├── crypto/               # Signer abstraction (local ES256 signer), RFC 8785 canonical JSON, PoP
+│   ├── did/                  # DidResolver seam + did:web (hardened) and did:key P-256
 │   ├── vc/                   # W3C VC issue/verify (JWS, ES256)
-│   ├── delegation/           # Attenuation-verified delegation chains
+│   ├── delegation/           # Attenuation-verified delegation chains (tested directly)
+│   ├── status/               # Bitstring Status List + quarantine
+│   ├── replay/               # Atomic claim-once replay protection (memory + Redis)
+│   ├── policy/               # Embedded OPA Wasm engine (hash-pinned artifact)
+│   ├── audit/                # Hash-chained Action Receipts + signed checkpoints
+│   ├── gateway/              # The Trust Gateway — one authorized path + simulated executor
 │   ├── trust-profile/        # Evidence-based trust profiles
-│   ├── schemas/              # JSON schemas for all contracts
-│   ├── policy-engine/        # PolicyEngine abstraction + OPA Wasm adapter
-│   ├── sdk/                  # Client SDK for agents
-│   └── testkit/              # Fixtures, test DID documents, attack builders
+│   ├── attacks/              # 60-scenario adversarial suite
+│   └── schemas/              # JSON schemas for all contracts
 ├── policies/                 # Rego — policies are code, versioned & hashed
-├── tests/                    # conformance / integration / e2e / attacks / chaos
-├── infra/                    # docker / terraform
-└── docs/                     # architecture, threat model, ADRs, roadmap
+├── artifacts/policy/         # committed, hash-pinned policy.wasm + manifest.json
+├── deploy/ · docker-compose*.yml · apps/web/Dockerfile   # demo deployment
+├── scripts/ · tests/         # demo/setup scripts; tests/* are empty placeholders (tests live in each package)
+└── docs/                     # architecture, threat model, ADRs, submission package
 ```
+
+**Target architecture, not built in P0** (empty `.gitkeep` placeholders only): `apps/trust-gateway`
+(standalone Fastify gateway), `apps/credential-service`, `apps/agent-alpha`, `apps/agent-beta`,
+`packages/policy-engine`, `packages/sdk`, `packages/testkit`, `infra/terraform`; plus `did:webvh`,
+Cloud KMS/HSM signing, PostgreSQL persistence and human-in-the-loop approvals. In P0 the gateway runs
+in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**✅ Architecture and features FROZEN for submission (Step 17).** Every P0 element below is implemented, tested (425 core + 27 frontend + 5 Redis integration + 60/60 adversarial + 13 native Rego), CI-gated, containerized, and verified in live did:web identity mode; the only outstanding item is the public dashboard URL itself (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)).
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 480 unit/property tests (with OPA on PATH — without it 10 native-parity cases skip), 45 frontend/API tests, 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: the public HTTPS dashboard URL (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)) and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|
 | **P0 — frozen** | `did:web` + `did:key` fixtures, real JWS/VC signing & verification, scoped delegation + attenuation, trusted issuers + real revocation, atomic Redis replay protection with fail-closed writes, Rego → embedded OPA Wasm with reason codes, tamper-evident provenance, two demo agents, attack suite, public live demo |
-| **P1 — after P0 E2E passes** | `did:webvh` resolver adapter, Cloud KMS/HSM signer, human-in-the-loop approvals, RFC 8693 token-exchange subset, one A2A adapter |
+| **P1 — not implemented** | `did:webvh` resolver adapter, Cloud KMS/HSM signer, human-in-the-loop approvals (`REQUIRE_APPROVAL`), `perDay` quota enforcement, multi-hop delegation through the gateway, RFC 8693 token-exchange subset, one A2A adapter |
 | **P2 — post-competition** | SPIFFE/SPIRE deployment, full MCP/A2A interop, multi-tenant control plane, selective disclosure |
 
 Build order and week-by-week plan: [docs/roadmap.md](docs/roadmap.md).
@@ -207,7 +228,8 @@ Requires Node 22+ (24 recommended). pnpm is provided via corepack:
 corepack enable
 pnpm install
 pnpm typecheck          # strict TS across the workspace
-pnpm test               # vitest unit + property suite (no services needed)
+pnpm test               # vitest unit + property suite (no services needed; run `pnpm setup:opa`
+                        # first or the 10 native-vs-Wasm parity cases are skipped)
 pnpm test:integration   # Redis-backed replay tests (needs TEST_REDIS_URL)
 docker compose up -d redis   # one-command dev Redis (port 6380 — 6379 is
                              # inside a Windows excluded-port range on some

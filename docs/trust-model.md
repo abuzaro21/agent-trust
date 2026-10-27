@@ -100,7 +100,9 @@ A denial names the exact violated constraint:
 2. Every decision records the `policyBundleHash` that produced it, so a decision from last week can be explained under *the policy that was in force then*.
 3. A failed explanation renderer degrades the explanation, never the security decision.
 
-## Human-in-the-Loop
+## Human-in-the-Loop *(P1 target — not implemented)*
+
+> In P0 the policy emits only `ALLOW` / `DENY`; `REQUIRE_APPROVAL` exists in the schemas as a contract but no approval flow, OIDC login or Approval object is built.
 
 Approvals live outside the prompt entirely. Example policy:
 
