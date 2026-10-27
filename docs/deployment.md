@@ -113,3 +113,86 @@ Server logs carry only taskId/reasonCode/receiptId/build SHA and transport
 errors. No private JWK JSON, no Redis URLs/credentials, no environment dumps
 are logged anywhere in the request path; the smoke's leak-scan step proves
 nothing secret reaches HTTP responses or browser bundles either.
+
+## Hosting requirements (measured / derived)
+
+| Item | Requirement | Evidence |
+|---|---|---|
+| App | **One** container replica of `apps/web/Dockerfile` (never scale out) | state is process-local (see State model) |
+| CPU / RAM | 1 shared vCPU, 256 MB is sufficient | web container used ~51 MiB RSS after the 8 presets (Docker stats, local); image 330 MB |
+| Redis | Redis **≥ 6** (the node-redis 6 client sends `HELLO`; a Redis 3.x server fails with `ERR unknown command 'HELLO'`). `redis:7-alpine` is what CI and the compose demo use. Persistence optional (claims are TTL-bounded) but recommended so replay denials survive a Redis restart | local Redis 3.0.504 failed the integration test; Redis 7 passed 5/5 |
+| Network | inbound HTTPS → container port 3000; outbound HTTPS to the DID host (`DEMO_DID_DOMAIN`) | the web-mode resolver fetches `https://<domain>/agents/<name>/did.json` |
+| Runtime user | the image runs as **root** (no `USER` in the Dockerfile) — acceptable for a synthetic-data demo; adding `USER node` is a recommended hardening, not done here to avoid changing a verified image | `docker exec … id` → uid 0 |
+
+## Secrets and key handling
+
+- Env names (values never go in Git, the image, logs or chat): `DEMO_ORG_KEY_JSON`, `DEMO_SUPPORT_KEY_JSON`,
+  `DEMO_REFUND_KEY_JSON` (private JWKs), `DEMO_REDIS_URL` (may contain credentials).
+- Source of the keys: `pnpm demo:did:init` writes them to `.local/demo-keys/` (gitignored). They must be the **same**
+  keys whose public halves are published in the `did.json` files — a mismatch makes the live resolver reject the identities.
+- Load them from a gitignored env file through the provider's import mechanism (for Fly: `fly secrets import < .local/live.secrets.env`)
+  rather than typing values on the command line or into shell history.
+- A public `did.json` must contain no `d` member; `smoke:live` scans responses, HTML and JS bundles for key material.
+- Rotation / suspected exposure: run `demo:did:init`, republish the new `did.json` files, import the new secrets, redeploy;
+  the resolver caches at most 10 minutes, so rotation propagates within that window.
+
+## Release deployment procedure
+
+1. **Preflight (on the release commit):** `git status` clean; `git rev-parse --short HEAD` = `<SHA>`; typecheck + tests green;
+   do **not** run `pnpm build:policy` (the committed `policy.wasm` is hash-pinned and rebuilding on another platform changes it).
+2. **Manifest:** copy `deploy/fly.example.toml` to `fly.toml`; set the app name/region and `DEMO_DID_DOMAIN=abuzaro21.github.io`.
+   Keep `[http_service] min_machines_running = 1`, `auto_stop_machines = "off"`, and a single machine.
+3. **Redis:** create a managed Redis ≥ 6; take its URL (a secret).
+4. **Secrets:** import `DEMO_REDIS_URL`, the three `DEMO_*_KEY_JSON` and `DEMO_BUILD_SHA=<SHA>` from the gitignored env file.
+5. **Deploy:** `fly deploy` (builds `apps/web/Dockerfile`; the image runs `demo:attacks` and `build:web` at build time).
+6. **Verify outside-in (all must pass before recording anything):**
+   - `curl -s https://<host>/api/health` → `status: ok`, `identityMode: web`, `build.sha` = `<SHA>`.
+   - `curl -s https://<host>/api/demo/status` → `identityMode: web`, `replayStore: redis`.
+   - `curl -s -o /dev/null -w '%{http_code}' https://abuzaro21.github.io/agents/{org,support,refund}/did.json` → `200` each.
+   - `DEMO_PUBLIC_URL=https://<host> pnpm smoke:live` → the documented 45 checks, **zero FAIL** (any FAIL blocks submission).
+   - Click through the 8 presets and `/attacks` once by hand.
+7. **Record** the walkthrough against this deployment (see `docs/submission/video-production-brief.md`), then create the tag
+   `builders-league-submission-v1` on `<SHA>` and fill the form.
+
+## Rollback
+
+- **Bad release:** redeploy the previous image (`fly releases` to find it, then `fly deploy --image <previous image>`); no data to
+  migrate — audit/profile state is rebuilt at start and replay claims are TTL-bounded.
+- **Take the demo offline immediately:** `fly scale count 0` (or stop the container). Nothing else depends on it.
+- **Key exposure:** follow "Rotation" above; then redeploy.
+- **Wrong public DID documents:** revert the commit in the `abuzaro21.github.io` Pages repo (public keys only).
+- Never roll forward by scaling to more than one replica.
+
+## Reproducibility assessment (release verification, 2026-10-28)
+
+| Question | Finding |
+|---|---|
+| Does the image build from a clean checkout? | **Yes** — built from a git worktree with `--frozen-lockfile` (pnpm 11.1.1 via corepack); build-time `demo:attacks` and `build:web` succeed |
+| Is the shipped policy the committed one? | **Yes** — `sha256sum /app/artifacts/policy/policy.wasm` inside the image equals `artifacts/policy/manifest.json` (`c0248310…eea8`) |
+| Is the image byte-for-byte reproducible? | **No** — `FROM node:24-alpine` is a floating tag (no digest pin) and layers carry timestamps; pin the digest for a stricter release |
+| Is `policy.wasm` reproducible across machines? | Only per platform: rebuilding with OPA 1.20.2 on Windows produced `28b7918e…` instead of the committed `c0248310…`. The committed artifact is authoritative; never regenerate it during release |
+| Does the compose demo start and serve the real gateway? | **Yes** — see the verification record |
+
+## Verification record (release branch)
+
+Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = executed and passed; `NOT RUN` = not executed; `BLOCKED` = could not run here.
+
+| Gate | Result |
+|---|---|
+| TypeScript typecheck | PASS |
+| Unit/property tests with OPA on PATH | PASS — 480/480 (46 files) |
+| Frontend/API tests | PASS — 45/45 (5 files) |
+| Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
+| OPA fmt / check / test | PASS — 13/13 |
+| Adversarial suite | PASS — 60/60 (52 attacks + 8 failure demos) |
+| Production web build | PASS |
+| Docker image build (`apps/web/Dockerfile`) | PASS — 330 MB |
+| Compose demo (`docker-compose.demo.yml` + Redis 7) | PASS — started on a free host port (3000 was occupied by an unrelated local container, which was not touched); `/api/health` ok, `replayStore: redis` |
+| Demo presets (8) against the container | PASS — same reason codes as documented |
+| Malformed-input exploit (`amount` −5 / 0 / "abc", `currency` "SARX") against the container | PASS — `REQUEST_MALFORMED`, no receipt, audit `chain.valid: true` |
+| `GET /api/attacks/report?run=1` | PASS — serves the stored artifact; runs nothing |
+| `smoke:live` (45 checks) | BLOCKED — needs private keys and a public URL |
+| Public HTTPS deployment | NOT RUN |
+
+Known cosmetic caveat: the `/attacks` page badge `baseline 414cbaa` is a historical constant in `packages/attacks/src/runner.ts`
+(the commit the suite was first baselined at), **not** the build SHA — do not narrate it as the deployed commit.
