@@ -170,6 +170,9 @@ export function buildVerifiedFacts(input: {
       resources: input.effectiveAuthority.resources,
       ...(input.effectiveAuthority.audience !== undefined ? { audience: input.effectiveAuthority.audience } : {}),
       ...(input.effectiveAuthority.limits !== undefined ? { limits: input.effectiveAuthority.limits } : {}),
+      // The signed authority window must reach the policy (Rego enforces it).
+      ...(input.effectiveAuthority.validFrom !== undefined ? { validFrom: input.effectiveAuthority.validFrom } : {}),
+      ...(input.effectiveAuthority.validUntil !== undefined ? { validUntil: input.effectiveAuthority.validUntil } : {}),
     },
     status: { credentialActive: true, quarantined: false },
     replay: { checked: true, claimed: true },
