@@ -132,7 +132,7 @@ production defects found; one test weakness fixed).
 ## Files in this package
 
 - `final-submission.md` (this summary)
-- `loom-script.md` (90-second narration, 192 tokens ≈ 79 s of speech)
+- `loom-script.md` (90-second narration, 167 tokens ≈ 67 s of speech)
 - `two-year-thesis.md`
 - `architecture.md` (one-screen snapshot)
 - `ai-tools-and-decisions.md`

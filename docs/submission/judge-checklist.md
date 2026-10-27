@@ -17,7 +17,7 @@ Nothing vague; every row is clickable or runnable.
 | **Accept / refuse a task** | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` |
 | **Live demo (HTTPS URL)** | **BLOCKER — see below** (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
 | **Public repository** | github.com/abuzaro21/agent-trust (MIT, CI on every push) | GitHub |
-| **90-second walkthrough** | Narration is 192 tokens ≈ 79 s of speech (`loom-script.md`); recording pending (needs the public URL — not recorded against localhost pretending to be public); the brief's take/edit rules are UNVERIFIED | `docs/submission/loom-script.md` |
+| **90-second walkthrough** | Narration is 167 tokens ≈ 67 s of speech (`loom-script.md`); recording pending (needs the public URL — not recorded against localhost pretending to be public); the brief's take/edit rules are UNVERIFIED | `docs/submission/loom-script.md` |
 | **Architecture snapshot** | One-screen diagram, this package | `docs/submission/architecture.md` |
 | **Failure thinking / negative tests** | 60/60 adversarial suite (52 attacks + 8 failure demos) judged on reason code AND side-effect invariants; served at `/attacks`; CI gate `pnpm test:attacks` | `packages/attacks/` |
 | **Two-year thesis** | 293 words (296 with the title; ≤300 limit — the limit itself is from the project's own notes, UNVERIFIED against the live brief) | `docs/submission/two-year-thesis.md` |
