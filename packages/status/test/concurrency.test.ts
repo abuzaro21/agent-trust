@@ -56,9 +56,30 @@ describe('StatusListManager — concurrent writers on one list (lost-update regr
     expect((await manager.readStatus(REV_LIST, 1)).set).toBe(true);
   });
 
-  it('operations on different lists do not serialize behind each other incorrectly', async () => {
-    await Promise.all([manager.revoke(REV_LIST, 0), manager.suspend(SUS_LIST, 0)]);
-    expect((await manager.readStatus(REV_LIST, 0)).set).toBe(true);
-    expect((await manager.readStatus(SUS_LIST, 0)).set).toBe(true);
+  it('a stalled write on one list does not block mutations of another list', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const inner = new InMemoryStatusListStore();
+    const store = {
+      get: (id: string) => inner.get(id),
+      put: async (list: Parameters<typeof inner.put>[0]) => {
+        if (list.id === REV_LIST && list.version > 1) await gate; // stall REV_LIST writes only
+        return inner.put(list);
+      },
+    };
+    const m = new StatusListManager(store, { clock: () => NOW });
+    await m.createList({ id: REV_LIST, purpose: 'revocation', controllerDid: ORG_DID, sizeBits: LIST_BITS });
+    await m.createList({ id: SUS_LIST, purpose: 'suspension', controllerDid: ORG_DID, sizeBits: LIST_BITS });
+
+    const stalled = m.revoke(REV_LIST, 0); // blocked inside put()
+    await m.suspend(SUS_LIST, 0); // must complete while REV_LIST is stalled
+    expect((await m.readStatus(SUS_LIST, 0)).set).toBe(true);
+    expect((await m.readStatus(REV_LIST, 0)).set).toBe(false); // not yet written
+
+    release();
+    await stalled;
+    expect((await m.readStatus(REV_LIST, 0)).set).toBe(true);
   });
 });
