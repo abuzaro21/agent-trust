@@ -33,7 +33,7 @@ Nothing vague; every row is clickable or runnable.
 | Dimension | Best evidence |
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
-| **Technical depth (25)** | 519 tests in the default run (435 package + 84 apps/web; OPA on PATH needed for all 519) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Technical depth (25)** | 520 tests in the default run (435 package + 85 apps/web; OPA on PATH needed for all 520) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
 | **Demo quality (20)** | One decision stage: AcmeOrg grants SupportAgent ≤ 500 SAR (read from the backend), two request buttons, a server-authoritative verdict with Authorization and Execution (simulated) as separate facts, and a side-by-side comparison built from the two real responses; spoof / revoked / replay failure cards (three more behind a disclosure); pipeline, receipts, audit history, attestations and the 60/60 report behind disclosures; light default + dark theme; 17 screenshots from real clicks (desktop, tablet, mobile, both themes); responsive at 1920/1440/768/390 px with 78 automated browser checks; optional video script (once recorded on the public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
@@ -43,7 +43,7 @@ Nothing vague; every row is clickable or runnable.
 | Item | Status |
 |---|---|
 | Security release (`92ff923` → `main` `e4ba7eb`): typecheck, 483 tests, 5 Redis, 13 OPA, 60/60 attacks, build, Docker build | PASS; CI green on the PR head and on the merge commit |
-| Judge-UI branch (code at `c7af0dd`): typecheck, 519 tests (435 package + 84 apps/web), 5 Redis, 13 OPA, 60/60 attacks, build, 78/78 browser checks | PASS locally; CI not yet run (branch not pushed, not merged) |
+| Judge-UI branch (code at `c7af0dd`): typecheck, 520 tests (435 package + 85 apps/web), 5 Redis, 13 OPA, 60/60 attacks, build, 78/78 browser checks | PASS locally; CI not yet run (branch not pushed, not merged) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
 | `smoke:live` 45/45 | PASS on 2026-10-28 against the OLD public build (4c25b4b); NOT RUN on a deployment of the merged code |
 | Public HTTPS URL (REQUIRED) | **BLOCKER** — the service is suspended; redeploy the merged code and re-verify |

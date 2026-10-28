@@ -19,6 +19,7 @@ import {
   explainReason,
   limitFromProfile,
   pipelineView,
+  policyLabel,
   shortHash,
   stagesToView,
   stoppedAt,
@@ -299,9 +300,18 @@ describe('authorization and execution are reported as two separate facts', () =>
     expect(s.authorization.label).toBe('No authorization decision');
     expect(s.authorization.detail).not.toMatch(/verification step failed/);
   });
-  it('policy engine failure: "Policy could not decide", not "denied before policy"', () => {
-    const s = decisionSplit(decision({ reasonCodes: ['POLICY_EVALUATION_ERROR'], stages: { ...ALLOW_STAGES, policy: 'FAIL', audit: 'NOT_RUN', execution: 'NOT_RUN' }, decisionReceiptId: undefined }));
+  it('policy engine crash (REAL gateway shape: stages.policy DENY + POLICY_EVALUATION_ERROR): "Policy could not decide", not "policy refused"', () => {
+    const d = decision({ reasonCodes: ['POLICY_EVALUATION_ERROR'], stages: { ...ALLOW_STAGES, policy: 'DENY', audit: 'NOT_RUN', execution: 'NOT_RUN' }, decisionReceiptId: undefined });
+    const s = decisionSplit(d);
     expect(s.authorization.label).toBe('Policy could not decide');
+    expect(s.authorization.detail).not.toMatch(/refused this specific request/);
+    expect(policyLabel(d)).toEqual({ text: 'engine error — denied', tone: 'deny' });
+  });
+  it('an ordinary policy denial still reads "Denied by policy" and policyLabel reports DENY', () => {
+    const d = decision({});
+    expect(decisionSplit(d).authorization.label).toBe('Denied by policy');
+    expect(policyLabel(d)).toEqual({ text: 'DENY', tone: 'deny' });
+    expect(policyLabel(decision({ stages: SPOOF_STAGES })).text).toBe('not reached');
   });
   it('EXECUTION_FAILED: authorized by policy, execution failed — and the verdict is NOT a denial', () => {
     const d = decision({ outcome: 'EXECUTION_FAILED', effect: 'ALLOW', reasonCodes: ['IDENTITY_VERIFIED'], stages: { ...ALLOW_STAGES, execution: 'FAILED' }, executionReceiptId: 'rcpt_out_t1' });

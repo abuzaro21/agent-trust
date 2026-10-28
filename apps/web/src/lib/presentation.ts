@@ -283,13 +283,15 @@ export function decisionSplit(decision: DecisionDto): { authorization: FactView;
     authorization = { tone: 'ok', label: 'Allowed by policy', detail: 'The deterministic policy found the request inside the verified authority.' };
   } else if (decision.effect !== 'DENY') {
     authorization = { tone: 'warn', label: 'No authorization decision', detail: 'The request did not reach a policy decision.' };
+  } else if (decision.reasonCodes.includes('POLICY_EVALUATION_ERROR') || FAIL_VALUES.has(policy) && policy !== 'DENY') {
+    // The real gateway reports a policy-engine crash as stages.policy = 'DENY' + POLICY_EVALUATION_ERROR (fail closed);
+    // the engine did not refuse the request on its merits, it could not decide.
+    authorization = { tone: 'deny', label: 'Policy could not decide', detail: 'The policy engine failed, so the request was denied rather than guessed at.' };
   } else if (policy === 'DENY') {
     authorization = { tone: 'deny', label: 'Denied by policy', detail: 'Every verification step passed; the policy refused this specific request.' };
   } else if (policy === 'ALLOW') {
     // e.g. AUDIT_LOG_UNAVAILABLE: policy said ALLOW, but nothing may run without a durable decision receipt.
     authorization = { tone: 'warn', label: 'Allowed by policy, then stopped', detail: 'The policy allowed it, but a required receipt could not be written, so the gateway did not run it.' };
-  } else if (FAIL_VALUES.has(policy)) {
-    authorization = { tone: 'deny', label: 'Policy could not decide', detail: 'The policy engine failed, so the request was denied rather than guessed at.' };
   } else if (verificationFailed) {
     authorization = { tone: 'deny', label: 'Denied before policy', detail: 'A verification step failed, so policy never ran.' };
   } else {
@@ -315,6 +317,13 @@ export function decisionSplit(decision: DecisionDto): { authorization: FactView;
     execution = { tone: 'neutral', label: raw, detail: 'Reported by the gateway.' };
   }
   return { authorization, execution };
+}
+
+/** What the policy step reported, in words (a crashed engine is not an ordinary refusal). */
+export function policyLabel(decision: DecisionDto): { text: string; tone: Tone } {
+  if (decision.reasonCodes.includes('POLICY_EVALUATION_ERROR')) return { text: 'engine error — denied', tone: 'deny' };
+  const raw = decision.stages.policy;
+  return { text: raw === 'NOT_RUN' ? 'not reached' : raw, tone: raw === 'ALLOW' ? 'ok' : raw === 'DENY' || raw === 'FAIL' ? 'deny' : 'neutral' };
 }
 
 /** "n of 4 verification steps passed" — read from the stages, never inferred. */

@@ -22,6 +22,7 @@ import {
   decisionSplit,
   limitFromProfile,
   pipelineView,
+  policyLabel,
   shortHash,
   stoppedAt,
   verdictFor,
@@ -157,6 +158,7 @@ export function Verdict({ record, limit }: { record: RunRecord; limit: { amount:
   const stop = stoppedAt(pipelineView(decision));
   const split = decisionSplit(decision);
   const verif = verificationSummary(decision);
+  const policy = policyLabel(decision);
   return (
     <div className={`verdict verdict--${v.tone}`} key={decision.taskId}>
       <div className="top">
@@ -197,9 +199,7 @@ export function Verdict({ record, limit }: { record: RunRecord; limit: { amount:
       </dl>
       <div className="chips" style={{ marginTop: 'var(--s3)' }}>
         <Chip tone={verif.passed === verif.total ? 'ok' : 'deny'}>{verif.passed} of {verif.total} verification steps passed</Chip>
-        <Chip tone={decision.stages.policy === 'ALLOW' ? 'ok' : decision.stages.policy === 'DENY' ? 'deny' : 'neutral'}>
-          Policy: {decision.stages.policy === 'NOT_RUN' ? 'not reached' : decision.stages.policy}
-        </Chip>
+        <Chip tone={policy.tone}>Policy: {policy.text}</Chip>
       </div>
       {record.evaluation.firstResult !== undefined && (
         <p className="note" style={{ marginTop: 'var(--s2)' }}>

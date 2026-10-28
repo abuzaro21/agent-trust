@@ -115,7 +115,7 @@ Security release (92ff923, merged to main as e4ba7eb — tree-identical):
   (details: docs/deployment.md "Verification record")
 
 Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at c7af0dd; later commits are documentation only):
-  typecheck 0 errors · 519 tests in the default run (435 package + 84 apps/web; 509 pass + 10 skip without OPA)
+  typecheck 0 errors · 520 tests in the default run (435 package + 85 apps/web; 510 pass + 10 skip without OPA)
   Redis integration 5/5 · OPA native 13/13 · adversarial suite 60/60 · production build
   browser automation 78/78 checks (`pnpm ui:check` against a local instance: layout at 4 widths, light/dark theme,
   decision stage in the first screen, comparison derived from the responses, failure cases, evidence disclosures,
