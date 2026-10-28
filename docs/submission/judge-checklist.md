@@ -43,7 +43,7 @@ Nothing vague; every row is clickable or runnable.
 | Item | Status |
 |---|---|
 | Security release (`92ff923` → `main` `e4ba7eb`): typecheck, 483 tests, 5 Redis, 13 OPA, 60/60 attacks, build, Docker build | PASS; CI green on the PR head and on the merge commit |
-| Judge-UI branch (code at `c7af0dd`): typecheck, 520 tests (435 package + 85 apps/web), 5 Redis, 13 OPA, 60/60 attacks, build, 78/78 browser checks | PASS locally; CI not yet run (branch not pushed, not merged) |
+| Judge-UI branch (code at `71b3ef6`): typecheck, 520 tests (435 package + 85 apps/web), 5 Redis, 13 OPA, 60/60 attacks, build, 78/78 browser checks | PASS locally; CI not yet run (branch not pushed, not merged) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
 | `smoke:live` 45/45 | PASS on 2026-10-28 against the OLD public build (4c25b4b); NOT RUN on a deployment of the merged code |
 | Public HTTPS URL (REQUIRED) | **BLOCKER** — the service is suspended; redeploy the merged code and re-verify |
