@@ -18,9 +18,8 @@ Recording rules:
 - Headless capture has no mouse cursor. Use highlight boxes placed from DOM bounding boxes (disclosed as overlays) instead of a drawn cursor; presets are clicked through the real DOM.
 - **Show the public HTTPS URL** (address bar or a lower-third) so viewers can see it is the deployed demo; keep a standing caption "executor simulated · demo clock 2026-09-15".
 - No background music or click sound effects by default (music licence is unverified; scripted clicks sound fake).
-- **Take rule — UNVERIFIED.** Whether the competition requires one unedited
-  continuous take (versus an edited cut) is not stated in the requirements the
-  project owner verified. Record each segment from the real running
+- **Take rule — none stated.** The challenge page (read 2026-10-28) states no
+  rule about a single unedited take versus an edited cut. Record each segment from the real running
   application; if the brief demands a single take, record the whole script
   in one pass. Never substitute synthetic visuals for the real UI.
 

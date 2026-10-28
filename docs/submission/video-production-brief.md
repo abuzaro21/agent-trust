@@ -20,8 +20,9 @@ Output spec (both): H.264 MP4, 1920×1080, 30 fps, `yuv420p`, AAC 48 kHz stereo,
 2. `GET /api/demo/status` shows `identityMode=web`, `replayStore=redis`.
 3. `DEMO_PUBLIC_URL=… pnpm smoke:live` reports 45/45.
 4. The three `did:web` documents resolve (HTTP 200) at their public URLs.
-5. Competition brief rules on the walkthrough (length, single take vs edited, hosting, subtitles) have
-   been read by the user — currently **UNVERIFIED**.
+5. Competition brief rules on the walkthrough: the challenge page (read 2026-10-28) names a 90-second length and
+   states no single-take, hosting or subtitle rule; any form-level limits beyond the URL field are **UNVERIFIED**
+   (see `submission-readiness.md`).
 6. Music licence for the chosen track is documented (see "Audio").
 
 ## Evidence rule
@@ -109,7 +110,7 @@ asserts the expected reason code in the DOM after each click and aborts if it di
 | FFmpeg | 9.0.2 present |
 | Chrome | present at `C:\Program Files\Google\Chrome\Application\chrome.exe` |
 | puppeteer-core | present (dev dependency) |
-| Existing screenshots | 17 PNGs in `docs/screenshots/` (desktop light and dark, tablet, mobile light and dark) regenerated from the current UI with real clicks against a local backend (`pnpm shots:live`). Reusable as README imagery; for the video, capture fresh footage from the deployed demo, do not reuse stills as evidence |
+| Existing screenshots | 17 PNGs in `docs/screenshots/` (desktop light and dark, tablet, mobile light and dark) regenerated from the current UI with real clicks against a local backend (`pnpm shots:live`; `08-evidence-light.png` and `17-security-tests.png` were refreshed on 2026-10-28 from the deployed build `f004ae8`). Reusable as README imagery; for the video, capture fresh footage from the deployed demo, do not reuse stills as evidence |
 | Prior TOTEX video workflow | not inspected (project rules forbid touching TOTEX during this work); user to point to a copy if wanted |
 | Brag on Haiku | not automatic — Brag runs on whatever model the session uses; Opus 5.5 auto-switches to `brag-slim`. Run the session/delegate on Haiku 5.5 and verify the serving model from runtime metadata |
 
