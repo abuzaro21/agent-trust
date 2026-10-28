@@ -178,7 +178,7 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Default `pnpm test` (OPA on PATH) | PASS — 504/504 in 47 files (435 package tests + the 69 `apps/web` tests); without OPA: 491 pass + 10 skipped |
+| Default `pnpm test` (OPA on PATH) | PASS — 504/504 in 47 files (435 package tests + the 69 `apps/web` tests); without OPA: 494 pass + 10 skipped |
 | `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 69/69 (6 files) |
 | `pnpm ui:check` (browser automation of the redesigned UI, local instance) | PASS — 43/43 (layout at 4 widths, keyboard, ALLOW/DENY, real step order, loading/error/validation, reduced motion) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
