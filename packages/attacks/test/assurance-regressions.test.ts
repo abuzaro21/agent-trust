@@ -204,7 +204,7 @@ describe('REPLAY-002 — typed counts replace the outcome-text regex', () => {
 describe('the previously-vacuous delegation scenarios now carry a real positive control', () => {
   it('AUTHORITY-005/006 record the walker verdict AND that the legitimate chain is accepted', async () => {
     expect((await observe('AUTHORITY-005')).invariants).toEqual({ walkerRejected: true, controlAttenuatedChainAccepted: true });
-    expect((await observe('AUTHORITY-006')).invariants).toEqual({ walkerRejected: true, controlWithinBudgetChainAccepted: true });
+    expect((await observe('AUTHORITY-006')).invariants).toEqual({ walkerRejected: true, notStrictlyLessRejected: true, controlWithinBudgetChainAccepted: true });
   });
 
   it('NEGATIVE CONTROL: a walker that accepts the attack, or rejects the legitimate chain, FAILS', async () => {
@@ -213,5 +213,59 @@ describe('the previously-vacuous delegation scenarios now carry a real positive 
       expect(INVARIANT_CHECKS[id]!({ ...o, invariants: { ...o.invariants, walkerRejected: false } }).ok, id).toBe(false);
       expect(INVARIANT_CHECKS[id]!({ ...o, invariants: { ...o.invariants, [control]: false } }).ok, id).toBe(false);
     }
+  });
+});
+
+describe('mutation-found gaps, now closed (each facet isolates ONE defence)', () => {
+  it('AUDIT-009 rejects four distinct checkpoint forgeries, each at its own gate', async () => {
+    const o = await observe('AUDIT-009');
+    expect(o.invariants).toMatchObject({
+      controlPinnedGenuineVerifies: true,
+      wrongSignerReasons: ['AUDIT_SIGNER_UNTRUSTED'],
+      badSignatureReasons: ['AUDIT_CHECKPOINT_INVALID'],
+      editedPayloadReasons: ['AUDIT_CHECKPOINT_INVALID'],
+      otherStreamReasons: ['AUDIT_CHECKPOINT_MISMATCH'],
+    });
+  });
+
+  it('NEGATIVE CONTROL: accepting any one forgery (e.g. a bad signature) makes AUDIT-009 FAIL', async () => {
+    const o = await observe('AUDIT-009');
+    const check = INVARIANT_CHECKS['AUDIT-009']!;
+    for (const key of ['wrongSignerReasons', 'badSignatureReasons', 'editedPayloadReasons', 'otherStreamReasons']) {
+      expect(check({ ...o, invariants: { ...o.invariants, [key]: ['ACCEPTED'] } }).ok, key).toBe(false);
+    }
+    expect(check({ ...o, invariants: { ...o.invariants, controlPinnedGenuineVerifies: false } }).ok).toBe(false);
+  });
+
+  it('AUDIT-005: the forged receipt carries a CORRECT own hash, so only the previousHash link can reject it', async () => {
+    const o = await observe('AUDIT-005');
+    expect(o.reasonCodes).toEqual(['AUDIT_CHAIN_INVALID']);
+    expect(o.invariants).toMatchObject({ chainValid: false, consumerHistoryVerified: false });
+  });
+
+  it('AUTHORITY-006 covers BOTH depth branches (no budget, and budget but not strictly less)', async () => {
+    const o = await observe('AUTHORITY-006');
+    expect(o.invariants).toMatchObject({ walkerRejected: true, notStrictlyLessRejected: true });
+    expect(INVARIANT_CHECKS['AUTHORITY-006']!({ ...o, invariants: { ...o.invariants, notStrictlyLessRejected: false } }).ok).toBe(false);
+  });
+
+  it('DIDWEB-009 isolates the kid-ownership check from the controller check', async () => {
+    const o = await observe('DIDWEB-009');
+    expect(o.invariants).toMatchObject({ foreignIdAndControllerRefused: true, foreignIdOwnControllerRefused: true, ownIdForeignControllerRefused: true });
+    for (const key of ['foreignIdAndControllerRefused', 'foreignIdOwnControllerRefused', 'ownIdForeignControllerRefused']) {
+      expect(INVARIANT_CHECKS['DIDWEB-009']!({ ...o, invariants: { ...o.invariants, [key]: false } }).ok, key).toBe(false);
+    }
+  });
+
+  it('DIDWEB-006 requires the redirect itself to be the recorded cause', async () => {
+    const o = await observe('DIDWEB-006');
+    expect(o.invariants.redirectRefusedByPolicy).toBe(true);
+    expect(INVARIANT_CHECKS['DIDWEB-006']!({ ...o, invariants: { ...o.invariants, redirectRefusedByPolicy: false } }).ok).toBe(false);
+  });
+
+  it('ATTEST-001 proves issuer-AND-type scoped trust: a trusted issuer is not trusted for another type', async () => {
+    const o = await observe('ATTEST-001');
+    expect(o.invariants.rejectedReasons).toEqual(['ATTESTATION_TYPE_UNSUPPORTED', 'UNTRUSTED_ISSUER']);
+    expect(INVARIANT_CHECKS['ATTEST-001']!({ ...o, invariants: { ...o.invariants, rejectedReasons: ['UNTRUSTED_ISSUER'] } }).ok).toBe(false);
   });
 });

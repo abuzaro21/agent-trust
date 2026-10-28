@@ -77,7 +77,7 @@ export const INVARIANT_CHECKS: Record<string, InvariantCheck> = {
   'AUTHORITY-004': deniedByPolicy,
   // Delegation walker, exercised directly (the gateway accepts a single link): rejects the attack, accepts the control.
   'AUTHORITY-005': (o) => requireInvariants(o, { walkerRejected: true, controlAttenuatedChainAccepted: true }),
-  'AUTHORITY-006': (o) => requireInvariants(o, { walkerRejected: true, controlWithinBudgetChainAccepted: true }),
+  'AUTHORITY-006': (o) => requireInvariants(o, { walkerRejected: true, notStrictlyLessRejected: true, controlWithinBudgetChainAccepted: true }),
   'STATUS-001': blockedBeforePolicy,
   'STATUS-002': blockedBeforePolicy,
   'STATUS-003': blockedBeforePolicy,
@@ -114,8 +114,17 @@ export const INVARIANT_CHECKS: Record<string, InvariantCheck> = {
   'AUDIT-007': auditTamperDetected({ rewrittenChainCoherent: true, checkpointRejected: true, consumerHistoryVerified: false }),
   'AUDIT-008': auditTamperDetected({ anchoredValid: false, consumerHistoryVerified: false }),
   // Forged checkpoint (wrong signer): the genuine one verifies under the same pin, the forgery does not.
-  'AUDIT-009': (o) => requireInvariants(o, { controlIntact: true, controlPinnedGenuineVerifies: true, checkpointValid: false }),
-  'ATTEST-001': (o) => requireInvariants(o, { victimAuthorityCount: 1, controlTrustedAttestations: 1, untrustedRejected: 1 }),
+  'AUDIT-009': (o) =>
+    requireInvariants(o, {
+      controlIntact: true,
+      controlPinnedGenuineVerifies: true,
+      wrongSignerReasons: ['AUDIT_SIGNER_UNTRUSTED'],
+      badSignatureReasons: ['AUDIT_CHECKPOINT_INVALID'],
+      editedPayloadReasons: ['AUDIT_CHECKPOINT_INVALID'],
+      otherStreamReasons: ['AUDIT_CHECKPOINT_MISMATCH'],
+    }),
+  'ATTEST-001': (o) =>
+    requireInvariants(o, { victimAuthorityCount: 1, controlTrustedAttestations: 1, rejectedReasons: ['ATTESTATION_TYPE_UNSUPPORTED', 'UNTRUSTED_ISSUER'] }),
   'ATTEST-002': (o) =>
     requireInvariants(o, { policyDeniedOverLimit: true, victimTrustedAttestations: 0, sybilRejected: 100, victimAuthorityCount: 1 }),
   'ATTEST-003': (o) => requireInvariants(o, { executorCalls: 0, victimTrustedAttestations: 2 }),
@@ -126,10 +135,14 @@ export const INVARIANT_CHECKS: Record<string, InvariantCheck> = {
   'DIDWEB-003': ssrfBlockedBeforeConnect,
   'DIDWEB-004': ssrfBlockedBeforeConnect,
   'DIDWEB-005': ssrfBlockedBeforeConnect,
-  'DIDWEB-006': didDocumentRefused,
+  'DIDWEB-006': (o) => allOf(didDocumentRefused(o), requireInvariants(o, { redirectRefusedByPolicy: true })),
   'DIDWEB-007': didDocumentRefused,
   'DIDWEB-008': didDocumentRefused,
-  'DIDWEB-009': didDocumentRefused,
+  'DIDWEB-009': (o) =>
+    allOf(
+      didDocumentRefused(o),
+      requireInvariants(o, { foreignIdAndControllerRefused: true, foreignIdOwnControllerRefused: true, ownIdForeignControllerRefused: true }),
+    ),
   'DIDWEB-010': (o) => requireInvariants(o, { firstFailed: true, secondSucceeded: true, secondResolvedToExpectedDid: true }),
   'DIDWEB-011': (o) => requireInvariants(o, { refetchedEveryResolve: true, keyRotated: true, keyAfterIsRotatedKey: true }),
   'INFRA-001': (o) => requireInvariants(o, { executorCalls: 0, policyAllowedThenAuditVeto: true }),

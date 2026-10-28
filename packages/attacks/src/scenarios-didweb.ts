@@ -189,7 +189,13 @@ export const DIDWEB_006: AttackScenario = {
       outcome: r.didDocument === null ? `redirect rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED',
       verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { controlResolves: await controlResolves(), resolutionError: r.didResolutionMetadata.error ?? null, notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        controlResolves: await controlResolves(),
+        resolutionError: r.didResolutionMetadata.error ?? null,
+        // cause: the redirect itself was refused (not merely 'some non-200'); typed marker is the stable prefix
+        redirectRefusedByPolicy: (r.didResolutionMetadata.message ?? '').startsWith('redirect rejected by policy'),
+        notCached: resolver.peekCache(DID) === undefined,
+      },
     };
   },
 };
@@ -250,18 +256,32 @@ export const DIDWEB_009: AttackScenario = {
   title: 'Foreign kid: verification method owned by another DID',
   expected: { verdict: 'REFUSED', outcome: 'kid-ownership binding fails', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
-    const resolver = await resolverWith(async () => ({
-      status: 200, headers: {}, body: JSON.stringify({
-        id: DID,
-        verificationMethod: [{ id: 'did:web:evil.example:agent#key-1', type: 'JsonWebKey2020', controller: 'did:web:evil.example:agent', publicKeyJwk: JWK }],
-      }),
-    }));
-    const r = await resolver.resolve(DID);
+    const serve = async (method: Record<string, unknown>) => {
+      const resolver = await resolverWith(async () => ({
+        status: 200, headers: {}, body: JSON.stringify({ id: DID, verificationMethod: [method] }),
+      }));
+      const r = await resolver.resolve(DID);
+      return { refused: r.didDocument === null, cached: resolver.peekCache(DID) !== undefined, error: r.didResolutionMetadata.error ?? null };
+    };
+    const foreign = 'did:web:evil.example:agent';
+    // (a) foreign id AND foreign controller; (b) foreign id with the CORRECT controller — isolates the kid-ownership
+    // check from the controller check; (c) own id with a foreign controller — isolates the controller check.
+    const a = await serve({ id: `${foreign}#key-1`, type: 'JsonWebKey2020', controller: foreign, publicKeyJwk: JWK });
+    const b = await serve({ id: `${foreign}#key-1`, type: 'JsonWebKey2020', controller: DID, publicKeyJwk: JWK });
+    const c = await serve({ id: `${DID}#key-1`, type: 'JsonWebKey2020', controller: foreign, publicKeyJwk: JWK });
+    const all = a.refused && b.refused && c.refused;
     return {
-      outcome: r.didDocument === null ? `foreign kid rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED',
-      verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
+      outcome: all ? 'foreign kid and foreign controller rejected in every combination' : 'UNDETECTED',
+      verdict: all ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { controlResolves: await controlResolves(), resolutionError: r.didResolutionMetadata.error ?? null, notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        controlResolves: await controlResolves(),
+        resolutionError: a.error,
+        foreignIdAndControllerRefused: a.refused,
+        foreignIdOwnControllerRefused: b.refused,
+        ownIdForeignControllerRefused: c.refused,
+        notCached: !a.cached && !b.cached && !c.cached,
+      },
     };
   },
 };

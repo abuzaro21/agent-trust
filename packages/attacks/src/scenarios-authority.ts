@@ -168,6 +168,11 @@ export const AUTHORITY_006: AttackScenario = {
       validUntil: NOW + 86_400,
     };
     const result = validateDelegationChain([parent, child]);
+    // Second branch: the parent HAS budget (2) but the child does not consume a level (child depth 2 is not < 2).
+    const notStrictlyLess = validateDelegationChain([
+      { ...parent, authority: { ...parent.authority, delegationDepth: 2 } },
+      { ...child, authority: { ...child.authority, delegationDepth: 2 } },
+    ]);
     // Control: with a parent that DOES have budget (depth 1) and a leaf child (depth 0) the chain is accepted.
     const control = validateDelegationChain([
       { ...parent, authority: { ...parent.authority, delegationDepth: 1 } },
@@ -177,9 +182,13 @@ export const AUTHORITY_006: AttackScenario = {
       outcome: !result.ok
         ? `depth budget enforced (${result.reasonCodes.join(', ')})`
         : 'UNEXPECTED: depth escalation accepted',
-      verdict: !result.ok ? 'REFUSED' : 'BREACHED',
+      verdict: !result.ok && !notStrictlyLess.ok ? 'REFUSED' : 'BREACHED',
       reasonCodes: result.ok ? [] : result.reasonCodes,
-      invariants: { walkerRejected: !result.ok, controlWithinBudgetChainAccepted: control.ok === true },
+      invariants: {
+        walkerRejected: !result.ok,
+        notStrictlyLessRejected: !notStrictlyLess.ok && notStrictlyLess.reasonCodes.includes('DELEGATION_DEPTH_EXCEEDED'),
+        controlWithinBudgetChainAccepted: control.ok === true,
+      },
     };
   },
 };

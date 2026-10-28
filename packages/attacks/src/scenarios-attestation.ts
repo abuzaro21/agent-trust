@@ -38,20 +38,23 @@ export const ATTEST_001: AttackScenario = {
     w.attestationStore.add('did:web:trust.example.com:agents:support', good.jws);
     const { jws } = await issueAttestation(w, { issuer: 'evil' });
     w.attestationStore.add('did:web:trust.example.com:agents:support', jws);
+    // Trust is scoped by issuer AND type: the trusted auditor is NOT trusted for OPERATIONAL_APPROVAL.
+    const scoped = await issueAttestation(w, { type: 'OPERATIONAL_APPROVAL' });
+    w.attestationStore.add('did:web:trust.example.com:agents:support', scoped.jws);
     w.agentCredentialStore.add('did:web:trust.example.com:agents:support', w.delegationJws);
     const cp = await anchorCheckpoint(w);
     const profile = await profileService(w, cp).build('did:web:trust.example.com:agents:support', { now: NOW });
     return {
       outcome:
-        profile.attestations.trusted.length === 1 && profile.attestations.rejected.length === 1
-          ? `untrusted vouch rejected (${profile.attestations.rejected[0]?.reasonCodes.join(',')}); trusted-issuer control accepted; authority unchanged`
+        profile.attestations.trusted.length === 1 && profile.attestations.rejected.length === 2
+          ? `untrusted-issuer and out-of-scope vouches rejected (${profile.attestations.rejected.flatMap((r) => r.reasonCodes).join(',')}); trusted control accepted; authority unchanged`
           : 'UNEXPECTED trust change',
-      verdict: profile.attestations.rejected.length === 1 && profile.attestations.trusted.length === 1 ? 'REFUSED' : 'BREACHED',
-      reasonCodes: profile.attestations.rejected[0]?.reasonCodes ?? [],
+      verdict: profile.attestations.rejected.length === 2 && profile.attestations.trusted.length === 1 ? 'REFUSED' : 'BREACHED',
+      reasonCodes: profile.attestations.rejected.flatMap((r) => r.reasonCodes),
       invariants: {
         victimAuthorityCount: profile.authority.active.length,
         controlTrustedAttestations: profile.attestations.trusted.length,
-        untrustedRejected: profile.attestations.rejected.length,
+        rejectedReasons: profile.attestations.rejected.flatMap((r) => r.reasonCodes).sort(),
       },
     };
   },

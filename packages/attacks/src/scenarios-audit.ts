@@ -146,7 +146,7 @@ export const AUDIT_005: AttackScenario = {
   category: 'AUDIT',
   kind: 'ATTACK',
   title: 'Forged receipt inserted into the chain',
-  expected: { verdict: 'DETECTED', outcome: 'hash linkage breaks at the forgery', reasonCode: 'AUDIT_CHAIN_INVALID' },
+  expected: { verdict: 'DETECTED', outcome: 'hash linkage breaks at the forgery (its own hash is self-consistent; only the previousHash link is wrong)', reasonCode: 'AUDIT_CHAIN_INVALID' },
   async run() {
     const { w, cp, receipts, controlIntact, controlConsumerHistoryVerified } = await prepare();
     const forged = structuredClone(receipts[0]!);
@@ -156,8 +156,11 @@ export const AUDIT_005: AttackScenario = {
       sequence: receipts.length + 1,
       decision: { ...forged.body.decision, effect: 'ALLOW' },
     };
-    // Recompute NOTHING else — the forger appends a self-consistent-looking
-    // event without the chain secret (the previous hash is stale).
+    // The forger appends an event whose own hash IS recomputed correctly (hashes are public SHA-256, there is no
+    // chain secret) but whose previousHash points at the wrong predecessor: only the linkage check can catch it.
+    const { computeEventHash, GENESIS_PREVIOUS_HASH } = await import('@agent-trust/audit');
+    forged.previousHash = GENESIS_PREVIOUS_HASH;
+    forged.eventHash = computeEventHash(forged.previousHash, forged.body);
     const tampered = [...receipts, forged];
     const chain = verifyAuditChain(STREAM, tampered);
     const consumerOk = await consumerHistoryVerified(w, cp, tampered);
@@ -261,35 +264,46 @@ export const AUDIT_009: AttackScenario = {
   id: 'AUDIT-009',
   category: 'AUDIT',
   kind: 'ATTACK',
-  title: 'Forged checkpoint signed by the wrong key',
-  expected: { verdict: 'DETECTED', outcome: 'signer verification fails', reasonCode: 'AUDIT_SIGNER_UNTRUSTED' },
+  title: 'Forged checkpoint: wrong signer, forged signature, edited payload, or another stream',
+  expected: { verdict: 'DETECTED', outcome: 'every checkpoint forgery is rejected by its own gate; the genuine checkpoint verifies under the same pin', reasonCode: 'AUDIT_SIGNER_UNTRUSTED' },
   async run() {
-    const { w, cp, controlIntact } = await prepare();
-    // Control: the genuine checkpoint verifies under the SAME pinned-signer options used against the forgery.
-    const genuine = await verifyCheckpointSignature({
-      checkpoint: cp,
-      didResolver: w.gatewayDeps.didResolver,
-      opts: { expectedSignerDid: 'did:web:trust.example.com:audit', now: NOW },
-    });
-    // An attacker checkpoints the SAME chain with their OWN key.
+    const { w, cp, receipts, controlIntact } = await prepare();
+    const opts = { expectedSignerDid: 'did:web:trust.example.com:audit', now: NOW };
+    const verify = (checkpoint: typeof cp) => verifyCheckpointSignature({ checkpoint, didResolver: w.gatewayDeps.didResolver, opts });
+    // Control: the genuine checkpoint verifies under the SAME pinned-signer options used against every forgery.
+    const genuine = await verify(cp);
+
+    // (a) An attacker checkpoints the SAME chain with their OWN key.
     const { AuditCheckpointService } = await import('@agent-trust/audit');
     const evilService = new AuditCheckpointService(w.evilSigner);
-    const forgedCp = await evilService.issue({
-      checkpointId: 'ckpt_evil',
-      streamId: STREAM,
-      receipts: await w.auditLog.readStream(STREAM),
-      issuedAt: '2026-09-15T12:00:00Z',
-    });
-    const verified = await verifyCheckpointSignature({
-      checkpoint: forgedCp,
-      didResolver: w.gatewayDeps.didResolver,
-      opts: { expectedSignerDid: 'did:web:trust.example.com:audit', now: NOW },
-    });
+    const wrongSigner = await verify(await evilService.issue({ checkpointId: 'ckpt_evil', streamId: STREAM, receipts, issuedAt: '2026-09-15T12:00:00Z' }));
+
+    // (b) Genuine signer DID and kid, but the signature bytes are corrupted.
+    const [h, p, sig] = cp.jws.split('.') as [string, string, string];
+    const flipped = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1);
+    const badSignature = await verify({ ...cp, jws: `${h}.${p}.${flipped}` });
+
+    // (c) Genuine signature, but the claimed payload was edited afterwards (valid shape, different head hash).
+    const editedPayload = await verify({ ...cp, payload: { ...cp.payload, headHash: '0'.repeat(64) } });
+
+    // (d) A genuine checkpoint presented for a DIFFERENT stream.
+    const genuineVerified = await verifyCheckpointSignature({ checkpoint: cp, didResolver: w.gatewayDeps.didResolver, opts });
+    const otherStream = verifyAuditAgainstCheckpoint({ streamId: 'other-stream', receipts, checkpoint: cp, checkpointVerified: genuineVerified });
+
+    const codes = (v: { valid: boolean; reasonCodes?: string[] }) => (v.valid ? ['ACCEPTED'] : (v.reasonCodes ?? []));
+    const rejected = !wrongSigner.valid && !badSignature.valid && !editedPayload.valid && !otherStream.valid;
     return {
-      outcome: !verified.valid ? 'checkpoint signer not the trusted anchor — rejected' : 'UNDETECTED',
-      verdict: !verified.valid ? 'DETECTED' : 'BREACHED',
-      reasonCodes: verified.valid ? [] : verified.reasonCodes,
-      invariants: { controlIntact, controlPinnedGenuineVerifies: genuine.valid, checkpointValid: verified.valid },
+      outcome: rejected ? 'all four checkpoint forgeries rejected; genuine checkpoint verifies' : 'UNDETECTED',
+      verdict: rejected && genuine.valid ? 'DETECTED' : 'BREACHED',
+      reasonCodes: wrongSigner.valid ? [] : wrongSigner.reasonCodes,
+      invariants: {
+        controlIntact,
+        controlPinnedGenuineVerifies: genuine.valid,
+        wrongSignerReasons: codes(wrongSigner),
+        badSignatureReasons: codes(badSignature),
+        editedPayloadReasons: codes(editedPayload),
+        otherStreamReasons: codes(otherStream),
+      },
     };
   },
 };
