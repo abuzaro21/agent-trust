@@ -24,7 +24,7 @@ const r = (s) => `\x1b[31m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
 console.log(b('agent-trust — Adversarial Suite'));
-console.log(dim('every scenario: isolated world, frozen clock, denial reason AND side-effect invariants\n'));
+console.log(dim('every scenario: isolated world, frozen clock, typed expected outcome AND machine-checked invariants\n'));
 
 const report = await runAttackSuite(only ? { only } : {});
 

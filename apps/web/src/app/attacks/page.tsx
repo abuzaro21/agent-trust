@@ -49,10 +49,10 @@ export default function AttacksPage() {
 
       <main id="main">
         <section className="hero" style={{ paddingBottom: 0 }}>
-          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Sixty adversarial scenarios, checked against expected behavior.</h1>
+          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Sixty security scenarios, each checked against a typed expected outcome.</h1>
           <p className="lead">
-            Each scenario is checked against its expected behavior (outcome and, where specified, reason code), and most also assert side-effect or state invariants — for example that the executor did not run when a request should be denied, and that a spoof is never attributed to its victim.
-          </p>
+            Every scenario declares an expected outcome class and is judged on machine-checked invariants — for example that the executor and policy never ran on a denial, that a corrupted policy bundle never produces an engine, and that untouched audit history verifies before it is tampered with. 48 also require a specific reason code; the other 12 (did:web resolver errors and one allowed-then-failed execution) record why they have none. A scenario fails if its checker or evidence is missing.
+            </p>
         </section>
 
         <div className="callout" style={{ marginTop: 'var(--s5)' }}>
@@ -177,7 +177,13 @@ function ScenarioCard(props: { sc: AttackScenarioDto; open: boolean; onToggle: (
         <div id={panel} style={{ padding: 'var(--s4)', borderTop: '1px solid var(--border)' }}>
           <dl className="kv">
             <dt>Expected</dt>
-            <dd>{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
+            <dd>{sc.expected.verdict ? `${sc.expected.verdict} — ` : ''}{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
+            {sc.expected.noReasonCode !== undefined && (
+              <>
+                <dt>No reason code</dt>
+                <dd>{sc.expected.noReasonCode}</dd>
+              </>
+            )}
             <dt>Observed</dt>
             <dd className="mono wrap-any">{sc.observed.outcome}</dd>
             {sc.observed.reasonCodes.length > 0 && (
