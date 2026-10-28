@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { buildSha } from '@/server/build-info';
 import { identityMode } from '@/server/identity';
 
 /**
@@ -22,7 +23,7 @@ export function GET(): NextResponse {
     status: 'ok',
     identityMode: identity,
     build: {
-      sha: process.env.DEMO_BUILD_SHA ?? 'dev',
+      sha: buildSha(),
       version: '1.0.0',
     },
   });

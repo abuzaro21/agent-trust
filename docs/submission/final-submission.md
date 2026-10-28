@@ -2,9 +2,9 @@
 
 ## Status
 
-**BLOCKED ONLY BY: `SUBMISSION BLOCKER: PUBLIC_DASHBOARD_URL`**
-(plus the walkthrough recording, which must be captured against the public
-deployment). No public URL is invented.
+**Public demo status (2026-10-28):** https://agent-trust.onrender.com exists (Render free plan, real did:web identities,
+Redis replay) and passed `smoke:live` 45/45, **but it runs the pre-audit build `4c25b4b`**. Remaining blockers: redeploy
+the release commit and re-verify it (`smoke:live`, presets, audit chain), then record the walkthrough against it.
 
 **Release baseline.** The original submission freeze (`c286ebd`) predates an
 independent audit. Post-audit repairs live on branch
@@ -13,10 +13,9 @@ commits follow it). The final submitted SHA is whatever commit is tagged
 `builders-league-submission-v1` — record it with `git rev-parse --short HEAD`
 and pass it as `DEMO_BUILD_SHA`.
 
-When a hosting login (e.g. Fly.io) is available, the remaining act is the
-procedure in [docs/deployment.md](../deployment.md). The earlier live-identity
-rehearsal (`smoke:live` 45/45, Step 16) is **not** evidence for the current
-build: re-run it against the public URL.
+The remaining act is to redeploy the existing Render service from the release commit and re-verify it
+(procedure in [docs/deployment.md](../deployment.md)). The 45/45 smoke seen on 2026-10-28 was against the
+pre-audit build, so it is **not** evidence for the release commit: re-run it after the redeploy.
 
 ## Form data (copy/paste)
 
@@ -30,7 +29,8 @@ One-line description: A verifiable trust layer for AI agents combining
 
 Repo URL:            https://github.com/abuzaro21/agent-trust
 
-Live Demo URL:       PENDING HOSTING ACCOUNT — see SUBMISSION BLOCKER above.
+Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit build 4c25b4b —
+                     do NOT submit until it is redeployed from the release commit).
                      Runs from one command:
                        git clone https://github.com/abuzaro21/agent-trust
                        cd agent-trust
@@ -114,14 +114,15 @@ are from those runs; historical counts from the original freeze are not reused.
 
 ```text
 TypeScript typecheck       0 errors
-default `pnpm test`        480 passed (435 package + 45 apps/web; 470 pass + 10 skip without OPA)
-frontend/API subset        45 passed (`pnpm test:frontend`, already inside the 480)
+default `pnpm test`        483 passed (435 package + 48 apps/web; 473 pass + 10 skip without OPA)
+frontend/API subset        48 passed (`pnpm test:frontend`, already inside the 483)
 redis integration          5/5 (Redis 7)
 OPA native tests           13/13
 adversarial suite          60/60 (52 attacks + 8 failure demos)
 production web build       passes
 CI                         green on the original freeze; re-run on the release branch is pending
-live-mode smoke            NOT re-run (needs private keys + public URL) — earlier 45/45 is historical
+live-mode smoke            45/45 against the CURRENT public service, which runs the pre-audit build 4c25b4b;
+                           NOT yet run against a deployment of the release commit
 docker image / compose     see docs/deployment.md "Verification record"
 ```
 

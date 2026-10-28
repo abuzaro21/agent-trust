@@ -15,7 +15,7 @@ Nothing vague; every row is clickable or runnable.
 | **Grant / scope issuance** | Org issuer signs delegations; trusted-issuer registry gates whose claims count | `packages/vc` `CredentialIssuer` + `InMemoryIssuerTrustStore` |
 | **Revoke** | W3C Bitstring Status List (permanent revocation, reversible suspension) + emergency quarantine — current status kills authority | `packages/status/src/` · "Revoked Credential" preset |
 | **Accept / refuse a task** | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` |
-| **Live demo (HTTPS URL)** | **BLOCKER — see below** (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
+| **Live demo (HTTPS URL)** | **https://agent-trust.onrender.com exists but runs the pre-audit build 4c25b4b — redeploy + re-verify before submitting** (see below) (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
 | **Public repository** | github.com/abuzaro21/agent-trust (MIT, CI on every push) | GitHub |
 | **90-second walkthrough** | Narration is 167 tokens ≈ 67 s of speech (`loom-script.md`); recording pending (needs the public URL — not recorded against localhost pretending to be public); the brief's take/edit rules are UNVERIFIED | `docs/submission/loom-script.md` |
 | **Architecture snapshot** | One-screen diagram, this package | `docs/submission/architecture.md` |
@@ -31,7 +31,7 @@ Nothing vague; every row is clickable or runnable.
 | Dimension | Best evidence |
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
-| **Technical depth (25)** | 480 tests in the default run (435 package + 45 apps/web; OPA on PATH needed for all 480) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Technical depth (25)** | 483 tests in the default run (435 package + 48 apps/web; OPA on PATH needed for all 483) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
 | **Demo quality (20)** | Live dashboard: presets, pipeline view, receipts, profile, DID badges; 5 screenshots at 1440×900; Loom script (once recorded on public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
@@ -40,27 +40,25 @@ Nothing vague; every row is clickable or runnable.
 
 | Item | Status |
 |---|---|
-| Typecheck, 480 tests (incl. the 45 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build | PASS on the release branch (see `final-submission.md`) |
+| Typecheck, 483 tests (incl. the 48 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build | PASS on the release branch (see `final-submission.md`) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
-| `smoke:live` 45/45 | NOT RUN on the release build (needs keys + public URL) |
-| Public HTTPS URL, 90-second walkthrough | BLOCKER — not produced |
+| `smoke:live` 45/45 | PASS against the current public service (pre-audit build 4c25b4b); NOT RUN on a deployment of the release commit |
+| Public HTTPS URL on the release commit, 90-second walkthrough | BLOCKER — URL exists on the old build; walkthrough not recorded |
 | Live challenge brief (fields, take rules, thesis limit) | UNVERIFIED — brief not accessible |
 
 ## Submission status
 
 ```text
 SUBMISSION BLOCKER (only one):
-PUBLIC_DASHBOARD_URL
+REDEPLOY THE RELEASE COMMIT — https://agent-trust.onrender.com currently runs the pre-audit build 4c25b4b
 
-Exact procedure after a provider login (e.g. Fly.io):
-  1. fly launch (uses deploy/fly.example.toml — set DEMO_DID_DOMAIN=abuzaro21.github.io)
-  2. fly redis create
-  3. fly secrets set DEMO_REDIS_URL=... DEMO_ORG_KEY_JSON=... \
-       DEMO_SUPPORT_KEY_JSON=... DEMO_REFUND_KEY_JSON=... DEMO_BUILD_SHA=$(git rev-parse --short HEAD)
-  4. fly deploy
-  5. DEMO_PUBLIC_URL=https://<host>.fly.dev corepack pnpm smoke:live   → require 45/45
-Then record the Loom per loom-script.md checklist, pin screenshots to the
-deployed commit, and create tag builders-league-submission-v1 on the final SHA.
+Procedure (Render free plan, existing service `agent-trust`; see docs/deployment.md):
+  1. Merge the release branch (with approval), disable the service's auto-deploy first.
+  2. Tag the release commit; deploy that exact SHA (render deploys create <service> --commit <SHA> --wait).
+  3. Verify: /api/health build.sha == release SHA; /api/demo/status identityMode=web, replayStore=redis;
+     DEMO_PUBLIC_URL=https://agent-trust.onrender.com corepack pnpm smoke:live → require 45/45.
+Then record the walkthrough per loom-script.md (allow ~1 min cold start on the free plan), pin screenshots to
+the deployed commit, and create tag builders-league-submission-v1 on the final SHA.
 ```
 
 Key values live only in `.local/` (gitignored); they are generated by

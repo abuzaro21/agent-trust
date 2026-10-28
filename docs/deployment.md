@@ -83,19 +83,14 @@ overlay for web identity mode). `smoke:live` is the deployment regression
 gate (16AA/16Z): 45 checks incl. public DID resolution, judge scenarios,
 leak scans of API responses + HTML + JS bundles.
 
-## Public status (honesty statement, Step 16Y blocker rules)
+## Public status (2026-10-28)
 
-The full public deployment (host + DNS + secrets custody) requires a cloud
-account with billing credentials. As of this step the environment has no
-provider CLI/token available (verified: flyctl/railway/render/heroku/vercel/
-gcloud/az/doctl absent; docker credential store empty; AWS SSO token expired
-2026-06-10). **Missing credential: a hosting provider login (e.g. Fly.io or
-Railway). No public URL is invented.** Everything deployable is committed:
-image, manifests, env contract, live-mode code, and the public did:web
-identities themselves (GitHub Pages needs no billing). The live rehearsal
-(`docker compose … up` + `smoke:live` 45/45) exercises the identical
-configuration that goes public once a provider login exists — run the three
-commands above and it is that demo.
+A Render **free** web service `agent-trust` (Docker, Frankfurt, one instance) and a free Render Key Value `agent-trust-redis`
+already exist in the account's workspace, serving https://agent-trust.onrender.com with real did:web identities and
+Redis-backed replay. It was last deployed manually on 2026-09-15 from commit `4c25b4b` — the **pre-audit build** — and passed
+`smoke:live` 45/45 on 2026-10-28. Its auto-deploy is currently **on for `main`**, so merging the release branch to `main`
+would redeploy it automatically; turn auto-deploy off first (`render services update agent-trust --auto-deploy=false` — verify
+the flag semantics) so the release commit is deployed deliberately and verified.
 
 ## Abuse scope (16S/16W/16V)
 
@@ -181,8 +176,8 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Default `pnpm test` (OPA on PATH) | PASS — 480/480 in 46 files (435 package tests + the 45 `apps/web` tests); without OPA: 470 pass + 10 skipped |
-| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 45/45 (5 files) |
+| Default `pnpm test` (OPA on PATH) | PASS — 483/483 in 47 files (435 package tests + the 48 `apps/web` tests); without OPA: 473 pass + 10 skipped |
+| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 48/48 (6 files) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
 | OPA fmt / check / test | PASS — 13/13 |
 | Adversarial suite | PASS — 60/60 (52 attacks + 8 failure demos) |
@@ -192,17 +187,18 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Demo presets (8) against the container | PASS — same reason codes as documented |
 | Malformed-input exploit (`amount` −5 / 0 / "abc", `currency` "SARX") against the container | PASS — `REQUEST_MALFORMED`, no receipt, audit `chain.valid: true` |
 | `GET /api/attacks/report?run=1` | PASS — serves the stored artifact; runs nothing |
-| `smoke:live` (45 checks) | BLOCKED — needs private keys and a public URL |
-| Public HTTPS deployment | NOT RUN |
+| `smoke:live` (45 checks) against https://agent-trust.onrender.com | PASS 45/45 on 2026-10-28 — **but that service runs the pre-audit build `4c25b4b`**, not this branch (the smoke needs only the public URL, not private keys) |
+| Redeploy of the release commit to Render | NOT RUN — requires approval |
 
 Known cosmetic caveat: the `/attacks` page badge `baseline 414cbaa` is a historical constant in `packages/attacks/src/runner.ts`
 (the commit the suite was first baselined at), **not** the build SHA — do not narrate it as the deployed commit.
 
-## Alternative host: Render free plan (planned, not deployed)
+## Render free plan notes
 
 `render.yaml` at the repository root is a Blueprint for the free plan (Docker runtime, single instance, `autoDeployTrigger: "off"`,
-`PORT=3000` pinned, secrets as `sync: false`). It has **not** been applied or validated against Render (`render blueprints validate`
-needs a logged-in workspace); only its YAML syntax was checked.
+`PORT=3000` pinned, secrets as `sync: false`). `render blueprints validate render.yaml` reports `valid: true` (plan: create service
+`agent-trust-demo`). It has **not** been applied: the account already has the service `agent-trust`, so applying the Blueprint would
+create a second one — keep it as the declarative reference and manage the existing service instead.
 
 Facts from Render's public docs (checked 2026-10-28) that affect this demo:
 

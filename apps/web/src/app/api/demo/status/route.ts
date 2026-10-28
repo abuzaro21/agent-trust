@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { buildSha } from '@/server/build-info';
 import { identityMode } from '@/server/identity';
 import { demoWorld } from '@/server/world';
 
@@ -24,7 +25,7 @@ export async function GET(): Promise<NextResponse> {
         'Challenge Demo Environment — single app replica; audit/demo state resets on restart; replay claims persist while Redis is configured',
       clock: 'frozen demo clock 2026-09-15T12:00:00Z',
       build: {
-        sha: process.env.DEMO_BUILD_SHA ?? 'dev',
+        sha: buildSha(),
         version: '1.0.0',
       },
     });

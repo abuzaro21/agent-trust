@@ -1,6 +1,7 @@
 # Render Blueprint for the Agent Trust demo (DOO Builders League).
 # Free plan only. Secrets are `sync: false` (entered once in the Render dashboard
 # at Blueprint creation) — never put values in this file.
+# The running build reports its commit from Render's RENDER_GIT_COMMIT (see apps/web/src/server/build-info.ts).
 # Single instance: demo audit/profile state is process-local (see docs/deployment.md).
 services:
   - type: web
@@ -26,9 +27,6 @@ services:
         value: web
       - key: DEMO_DID_DOMAIN
         value: abuzaro21.github.io
-      # Short release SHA (set per release; see docs/deployment.md).
-      - key: DEMO_BUILD_SHA
-        sync: false
       # rediss://… from the Redis provider (TLS). Secret.
       - key: DEMO_REDIS_URL
         sync: false

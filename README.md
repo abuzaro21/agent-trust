@@ -10,11 +10,8 @@
 > [docs/submission/loom-script.md](docs/submission/loom-script.md)).
 > The interactive demo (full gateway + Redis-backed replay; the Quickstart runs it
 > with local **fixture** identities — real `did:web` identities need the live overlay
-> and secrets described in [docs/deployment.md](docs/deployment.md)) runs from one command. A public hosted
-> URL is pending a hosting-provider account; everything needed to deploy it is
-> committed. The 45-check live smoke suite passed in an earlier local rehearsal
-> against the public identities and must be re-run against the public URL once
-> it exists. The screenshots below come from that earlier rehearsal.
+> and secrets described in [docs/deployment.md](docs/deployment.md)) runs from one command. 
+> A public Render deployment exists at https://agent-trust.onrender.com, but as of 2026-10-28 it runs the **pre-audit build `4c25b4b`** (it still has the audit-chain-poisoning flaw fixed on the release branch). It passed the 45-check live smoke suite (45/45, observed 2026-10-28) and must be redeployed from the release commit and re-verified before it is submitted. The screenshots below come from an earlier rehearsal.
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
@@ -211,7 +208,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 480 tests in the default `pnpm test` run (435 package tests + the 45 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 470 pass and 10 native-parity cases skip), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: the public HTTPS dashboard URL (hosting-account blocker — see [docs/deployment.md](docs/deployment.md)) and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 483 tests in the default `pnpm test` run (435 package tests + the 48 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 473 pass and 10 native-parity cases skip), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|
