@@ -114,11 +114,15 @@ Security release (92ff923, merged to main as e4ba7eb — tree-identical):
   CI: green on the PR head and on the merge commit e4ba7eb
   (details: docs/deployment.md "Verification record")
 
-Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at e45a7f9; later commits are documentation only):
-  typecheck 0 errors · 504 tests in the default run (435 package + 69 apps/web; 494 pass + 10 skip without OPA)
+Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at c7af0dd; later commits are documentation only):
+  typecheck 0 errors · 519 tests in the default run (435 package + 84 apps/web; 509 pass + 10 skip without OPA)
   Redis integration 5/5 · OPA native 13/13 · adversarial suite 60/60 · production build
-  browser automation 45/45 checks (`pnpm ui:check` against a local instance: layout at 4 widths, keyboard, states)
+  browser automation 78/78 checks (`pnpm ui:check` against a local instance: layout at 4 widths, light/dark theme,
+  decision stage in the first screen, comparison derived from the responses, failure cases, evidence disclosures,
+  mobile scroll-into-view with focus kept, keyboard, states)
   CI: NOT YET RUN — the branch is not pushed
+  Note: under heavy CPU contention the default parallel run has twice timed out one pre-existing 150-run property test
+  (packages/status, 5 s default) that passes alone in ~2 s; it is unrelated to this branch (no package changed).
 
 Public service (https://agent-trust.onrender.com):
   SUSPENDED for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b).
@@ -127,7 +131,7 @@ Public service (https://agent-trust.onrender.com):
 
 Independent review: a read-only audit by a second model family (Codex GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass
 challenged its findings, and Codex re-reviewed the repair commits and, separately, the UI redesign (9 verified defects fixed, then a
-re-review whose remaining findings were also fixed).
+re-review whose remaining findings were also fixed). The single-stage redesign then got its own independent read-only review after the last UI change: 3 verified defects (authorization misreported for an audit veto, comparison could call different outcomes identical, two browser checks that could pass vacuously) were fixed with regression tests.
 
 ## Files in this package
 

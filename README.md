@@ -25,8 +25,8 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
 
 ### What this demo is — and is not
 
-- **The executor is a simulation.** `DemoRefundExecutor` moves no money; the dashboard says
-  "Challenge Demo · simulation, not a payment system".
+- **The executor is a simulation.** `DemoRefundExecutor` moves no money; the page says
+  "Simulation · no real money" in the header and "Simulated refund executor — no money moves." on the decision stage.
 - **The agents are server-owned fixtures.** The public API signs custom requests as the demo
   SupportAgent; it demonstrates the trust pipeline, it does not authenticate external callers.
   The *Replay* preset sends the identical signed request twice from the server; the *Revoked* preset revokes a separate isolated

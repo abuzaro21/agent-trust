@@ -178,9 +178,9 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Default `pnpm test` (OPA on PATH) | PASS — 504/504 in 47 files (435 package tests + the 69 `apps/web` tests); without OPA: 494 pass + 10 skipped |
-| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 69/69 (6 files) |
-| `pnpm ui:check` (browser automation of the redesigned UI, local instance) | PASS — 45/45 (layout at 4 widths, keyboard, ALLOW/DENY, real step order, loading/error/validation, reduced motion) |
+| Default `pnpm test` (OPA on PATH; judge-UI code at `c7af0dd`) | PASS — 519/519 in 47 files (435 package tests + the 84 `apps/web` tests); without OPA: 509 pass + 10 skipped. Under heavy CPU contention one pre-existing property test (`packages/status`, 5 s timeout) has intermittently timed out in the parallel run and passes alone |
+| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 84/84 (6 files) |
+| `pnpm ui:check` (browser automation of the single-stage UI, local instance) | PASS — 78/78 (layout at 4 widths, light/dark theme, empty state before any request, ALLOW/DENY, authorization vs execution, response-derived comparison, failure cases, evidence disclosures, mobile scroll-into-view with focus kept, loading/error/retry/validation, reduced motion) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
 | OPA fmt / check / test | PASS — 13/13 |
 | Adversarial suite | PASS — 60/60 (52 attacks + 8 failure demos) |

@@ -36,7 +36,7 @@ broader than what was built, [architecture.md](architecture.md) says so.
                    (evidence — it NEVER grants authority and never scores)
 ```
 
-The dashboard renders exactly these eight steps, in this order, from the
+The UI renders exactly these eight steps (under "How it was decided" on the decision stage), in this order, from the
 backend's own result — it never reorders or infers them.
 
 Three properties carry the entire argument:
