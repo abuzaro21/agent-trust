@@ -21,6 +21,8 @@ export interface VerifiedFacts {
     resources: string[];
     audience?: string[];
     limits?: { amount?: number; currency?: string; perDay?: number };
+    validFrom?: string;
+    validUntil?: string;
   };
   status: { credentialActive: true; quarantined: false };
   replay: { checked: true; claimed: true };

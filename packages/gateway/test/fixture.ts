@@ -39,6 +39,8 @@ export interface World {
   quarantine: InMemoryAgentQuarantineStore;
   clock: { now: number };
   auditLog: InMemoryAuditLog;
+  /** Issue another valid (signed, status-bound) delegation with authority overrides. */
+  issueDelegationWith(authority: Record<string, unknown>): Promise<string>;
 }
 
 export async function buildWorld(opts: { statusPurpose?: 'revocation' | 'suspension' } = {}): Promise<World> {
@@ -123,6 +125,30 @@ export async function buildWorld(opts: { statusPurpose?: 'revocation' | 'suspens
     quarantine,
     clock,
     auditLog,
+    async issueDelegationWith(authority) {
+      const index = await statusManager.assignIndex(revListId);
+      const { jws } = await issuer.issueDelegation({
+        subjectDid: SUPPORT_AGENT_DID,
+        authority: {
+          actions: ['refund:create'],
+          resources: ['order:*'],
+          audience: [REFUND_AGENT_DID],
+          limits: { amount: 500, currency: 'SAR' },
+          delegationDepth: 0,
+          ...authority,
+        } as never,
+        validFrom: NOW_UNIX - 3600,
+        validUntil: NOW_UNIX + 86_400,
+        credentialStatus: {
+          id: `${revListId}#${index}`,
+          type: 'BitstringStatusListEntry',
+          statusPurpose: purpose,
+          statusListIndex: String(index),
+          statusListCredential: revListId,
+        },
+      });
+      return jws;
+    },
   };
 }
 

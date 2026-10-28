@@ -2,14 +2,20 @@
 
 ## Status
 
-**BLOCKED ONLY BY: `SUBMISSION BLOCKER: PUBLIC_DASHBOARD_URL`**
-(plus the Loom recording, which must be captured by the author against the
-public deployment). No public URL is invented. Everything else in this
-package is complete, verified, and frozen at commit `c286ebd`.
+**Public demo status (2026-10-28):** https://agent-trust.onrender.com exists (Render free plan, real did:web identities,
+Redis replay) and passed `smoke:live` 45/45, **but it runs the pre-audit build `4c25b4b`**. Remaining blockers: redeploy
+the release commit and re-verify it (`smoke:live`, presets, audit chain), then record the walkthrough against it.
 
-When a hosting login (e.g. Fly.io) is available, the remaining act is the
-three committed commands in [docs/deployment.md](../deployment.md) —
-already rehearsed end-to-end in live identity mode (smoke:live 45/45).
+**Release baseline.** The original submission freeze (`c286ebd`) predates an
+independent audit. Post-audit repairs live on branch
+`fix/agent-trust-doo-p0-20261028` (code baseline `043257b`; documentation
+commits follow it). The final submitted SHA is whatever commit is tagged
+`builders-league-submission-v1` — record it with `git rev-parse --short HEAD`
+and pass it as `DEMO_BUILD_SHA`.
+
+The remaining act is to redeploy the existing Render service from the release commit and re-verify it
+(procedure in [docs/deployment.md](../deployment.md)). The 45/45 smoke seen on 2026-10-28 was against the
+pre-audit build, so it is **not** evidence for the release commit: re-run it after the redeploy.
 
 ## Form data (copy/paste)
 
@@ -23,14 +29,16 @@ One-line description: A verifiable trust layer for AI agents combining
 
 Repo URL:            https://github.com/abuzaro21/agent-trust
 
-Live Demo URL:       PENDING HOSTING ACCOUNT — see SUBMISSION BLOCKER above.
+Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit build 4c25b4b —
+                     do NOT submit until it is redeployed from the release commit).
                      Runs from one command:
                        git clone https://github.com/abuzaro21/agent-trust
                        cd agent-trust
                        docker compose -f docker-compose.demo.yml up --build
                        → http://localhost:3000
-                     (identical configuration verified public-identity mode;
-                      public did:web identities below are live RIGHT NOW)
+                     (the quickstart runs fixture identities; the live overlay
+                      adds real did:web identities, see docs/deployment.md.
+                      The public did:web identities below resolve RIGHT NOW)
 
 Walkthrough URL:     PENDING RECORDING (script ready: loom-script.md)
 
@@ -51,7 +59,11 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       infrastructure — each judged on the denial reason AND
                       side-effect invariants (the executor really did not
                       run; a spoof is never attributed to the victim).
-                      Every dependency fails CLOSED. CI gate: pnpm test:attacks.
+                      Every dependency fails CLOSED (a policy-engine crash
+                      denies without a receipt). An independent post-freeze
+                      audit found and fixed audit-chain poisoning, a dropped
+                      authority window and a revocation race; remaining
+                      limits are listed below. CI gate: pnpm test:attacks.
 
 Standards used:       W3C DID Core, did:web (HTTPS-only, SSRF-pinned
                       resolution), W3C VC Data Model 2.0-style credentials
@@ -94,25 +106,35 @@ https://abuzaro21.github.io/agents/refund/did.json
 Each identity has its own P-256 key; private keys live only as deployment
 secrets (never committed, never in the image, never in the browser).
 
-## Verified metrics (final commit c286ebd)
+## Verified metrics (post-audit release branch)
+
+Executed on a clean worktree of the release branch (code baseline `043257b`),
+Windows 11, Node 24, pinned OPA 1.20.2, Redis 7 for integration. Counts below
+are from those runs; historical counts from the original freeze are not reused.
 
 ```text
-core tests            425 passing
-frontend tests        27 passing
-redis integration     5/5
-adversarial suite     60/60
-OPA native tests      13/13
-live-mode smoke       45/45
-CI                    18/18 green
-TypeScript            0 errors
-clean clone (HEAD)    install/typecheck/test/build/docker all green
-secret scan (git)     0 exposed secrets
+TypeScript typecheck       0 errors
+default `pnpm test`        483 passed (435 package + 48 apps/web; 473 pass + 10 skip without OPA)
+frontend/API subset        48 passed (`pnpm test:frontend`, already inside the 483)
+redis integration          5/5 (Redis 7)
+OPA native tests           13/13
+adversarial suite          60/60 (52 attacks + 8 failure demos)
+production web build       passes
+CI                         green on the original freeze; re-run on the release branch is pending
+live-mode smoke            45/45 against the CURRENT public service, which runs the pre-audit build 4c25b4b;
+                           NOT yet run against a deployment of the release commit
+docker image / compose     see docs/deployment.md "Verification record"
 ```
+
+Independent review: a read-only audit by a second model family (Codex
+GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass challenged its
+findings, and the same reviewer re-reviewed the five repair commits (no
+production defects found; one test weakness fixed).
 
 ## Files in this package
 
 - `final-submission.md` (this summary)
-- `loom-script.md` (90-second narration, timed)
+- `loom-script.md` (90-second narration, 167 tokens ≈ 67 s of speech)
 - `two-year-thesis.md`
 - `architecture.md` (one-screen snapshot)
 - `ai-tools-and-decisions.md`
@@ -121,7 +143,14 @@ secret scan (git)     0 exposed secrets
 
 ## Honest limitations (define P0 scope — not failures)
 
-Single app replica · process-local demo audit/profile state (resets on
-restart; Redis externalizes only replay) · synthetic `DemoRefundExecutor` ·
+Single app replica · process-local demo audit/profile/status state (resets on
+restart; Redis externalizes only replay) · synthetic `DemoRefundExecutor` (a
+simulation — no money moves) · frozen demo clock (2026-09-15T12:00:00Z) ·
 local signers rather than Cloud KMS · did:web inherits DNS+HTTPS operator
-trust · no OAuth/A2A/MCP integration. Details: [docs/deployment.md](../deployment.md).
+trust · no OAuth/A2A/MCP integration · the gateway accepts a single delegation
+link (multi-hop is tested in `packages/delegation`, not through the gateway) ·
+`limits.perDay` is not enforced · no human-in-the-loop approval (`REQUIRE_APPROVAL`
+is never produced) · a policy-engine crash denies without writing a receipt ·
+status-list freshness/rollback and DID key-purpose checks are not enforced ·
+the public API signs demo requests server-side (not caller authentication).
+Details: [docs/deployment.md](../deployment.md), [docs/threat-model.md](../threat-model.md#known-limitations-verified-during-release-audit).

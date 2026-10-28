@@ -87,3 +87,32 @@ describe('InMemoryAuditLog — append/chain semantics', () => {
     });
   });
 });
+
+describe('InMemoryAuditLog — rejects schema-invalid receipts before advancing the chain', () => {
+  it('a receipt with an invalid amount is refused and the stream is untouched', async () => {
+    const log = new InMemoryAuditLog();
+    const first = await log.append(STREAM_A, makeBody());
+    const bad = makeBody({
+      request: {
+        action: 'refund:create',
+        resource: 'order:ORD-918',
+        audience: 'did:web:payments.example:refund-agent',
+        parameters: { amount: -5, currency: 'SAR' },
+      },
+    });
+    await expect(log.append(STREAM_A, bad)).rejects.toThrow(/receipt/i);
+    expect(await log.getHead(STREAM_A)).toEqual({ streamId: STREAM_A, sequence: 1, headHash: first.eventHash });
+    const next = await log.append(STREAM_A, makeBody());
+    expect(next.body.sequence).toBe(2);
+    expect(next.previousHash).toBe(first.eventHash);
+    expect(verifyAuditChain(STREAM_A, await log.readStream(STREAM_A)).valid).toBe(true);
+  });
+
+  it('a refused first receipt does not even create the stream', async () => {
+    const log = new InMemoryAuditLog();
+    const bad = makeBody({ decision: { effect: 'DENY', reasonCodes: ['AUTHORITY_LIMIT_EXCEEDED'], policy: { id: 'p', version: '1', hash: 'unknown' } } });
+    await expect(log.append(STREAM_A, bad)).rejects.toThrow();
+    expect(await log.getHead(STREAM_A)).toBeNull();
+    expect(await log.readStream(STREAM_A)).toEqual([]);
+  });
+});

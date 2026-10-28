@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
+import {
+  SCHEMA_ID_ACTION_RECEIPT_ENVELOPE,
+  createValidator,
+  type Validator,
+} from '@agent-trust/schemas';
+
 import { computeEventHash, GENESIS_PREVIOUS_HASH } from './hash.js';
 import type {
   ActionReceipt,
@@ -12,6 +18,23 @@ interface StreamState {
   readonly receipts: ActionReceipt[];
   sequence: number;
   headHash: string;
+}
+
+// Compiling the receipt schemas is expensive; the validator is stateless, so
+// every log shares one lazily created instance.
+let sharedValidator: Validator | undefined;
+const defaultValidator = (): Validator => (sharedValidator ??= createValidator());
+
+/**
+ * Thrown by append() when a receipt fails the envelope schema. Nothing is
+ * persisted and the chain head does not advance — a malformed receipt can
+ * never poison the stream for later verification.
+ */
+export class AuditReceiptInvalidError extends Error {
+  constructor(readonly detail: string) {
+    super(`audit receipt rejected: ${detail}`);
+    this.name = 'AuditReceiptInvalidError';
+  }
 }
 
 /**
@@ -31,20 +54,19 @@ interface StreamState {
 export class InMemoryAuditLog implements AuditLog {
   readonly #streams = new Map<string, StreamState>();
   readonly #idFactory: () => string;
+  readonly #validator: Validator;
 
-  constructor(opts: { idFactory?: () => string } = {}) {
+  constructor(opts: { idFactory?: () => string; validator?: Validator } = {}) {
     this.#idFactory = opts.idFactory ?? (() => `rcpt_${randomUUID()}`);
+    this.#validator = opts.validator ?? defaultValidator();
   }
 
   async append(
     streamId: string,
     body: Omit<ActionReceiptBody, 'streamId' | 'sequence'>,
   ): Promise<ActionReceipt> {
-    let state = this.#streams.get(streamId);
-    if (state === undefined) {
-      state = { receipts: [], sequence: 0, headHash: GENESIS_PREVIOUS_HASH };
-      this.#streams.set(streamId, state);
-    }
+    const existing = this.#streams.get(streamId);
+    const state: StreamState = existing ?? { receipts: [], sequence: 0, headHash: GENESIS_PREVIOUS_HASH };
     const fullBody: ActionReceiptBody = {
       ...body,
       streamId,
@@ -53,6 +75,13 @@ export class InMemoryAuditLog implements AuditLog {
     const previousHash = state.headHash;
     const eventHash = computeEventHash(previousHash, fullBody);
     const receipt: ActionReceipt = { body: fullBody, previousHash, eventHash };
+    // Validate BEFORE any state change (same schema verifyAuditChain applies):
+    // an invalid receipt is refused, the stream is not created or advanced.
+    const outcome = this.#validator.validate(SCHEMA_ID_ACTION_RECEIPT_ENVELOPE, receipt);
+    if (!outcome.valid) {
+      throw new AuditReceiptInvalidError(outcome.errors.join('; '));
+    }
+    if (existing === undefined) this.#streams.set(streamId, state);
     state.receipts.push(receipt);
     state.sequence = fullBody.sequence;
     state.headHash = eventHash;

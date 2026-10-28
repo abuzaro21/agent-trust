@@ -9,7 +9,7 @@ import type { DidResolver } from '@agent-trust/did';
 import { validateDelegationChain } from '@agent-trust/delegation';
 import type { CredentialVerifier } from '@agent-trust/vc';
 import type { PolicyEngine } from '@agent-trust/policy';
-import { buildReceiptBody, resultDigestOf, type AuditLog, type ActionReceipt } from '@agent-trust/audit';
+import { buildReceiptBody, type AuditLog, type ActionReceipt } from '@agent-trust/audit';
 
 import type {
   ActionExecutor,
@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import { GATEWAY_HTU, taskContent } from './request.js';
 import { buildDelegationChain, buildVerifiedFacts, selectCredentials } from './credentials.js';
+import { validateActionParameters } from './parameters.js';
 
 /**
  * TrustGateway (Step 10) — the composition boundary. The agent/LLM runtime
@@ -106,6 +107,10 @@ export class TrustGateway {
       credentials: string[];
       proof: AgentProof;
     };
+    const parameterProblem = validateActionParameters(task.action, task.parameters);
+    if (parameterProblem !== undefined) {
+      return denied('REQUEST_MALFORMED', stages, parameterProblem);
+    }
 
     // ---- 2. PoP / identity (crypto first; NO replay claim yet) -------------
     stages.identity = 'FAIL';
@@ -378,7 +383,8 @@ export class TrustGateway {
       },
       execution: {
         state: execution.state,
-        ...(execution.result !== undefined ? { resultDigest: resultDigestOf(execution.result) } : {}),
+        // The builder digests the result itself (a `resultDigest` key here was silently dropped).
+        ...(execution.result !== undefined ? { result: execution.result } : {}),
       },
       correlation: {
         taskId: task.taskId,

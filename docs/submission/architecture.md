@@ -12,16 +12,16 @@ dashboard — the browser only renders what the backend already decided.
  ║  1  Proof of Possession  +  DID Resolution                                         ║
  ║       did:web over public HTTPS: pinned DNS, exact document.id binding,            ║
  ║       P-256-only, bounded cache          ── unresolved / bad kid ──► DENY          ║
- ║  ▼                                                                                 ║
- ║  2  Verifiable Credentials     ES256 compact-JWS VC · trusted-issuer registry ·    ║
+ ║       ▼                                                                            ║
+ ║  2  Replay Protection          atomic CLAIM-ONCE (Redis SET NX PX), after PoP      ║
+ ║       ▼                                                                            ║
+ ║  3  Verifiable Credentials     ES256 compact-JWS VC · trusted-issuer registry ·    ║
  ║       ▼                            Bitstring Status List (revocation/suspension) · ║
- ║  3  Delegated Authority          quarantine kill switch        any failure ─► DENY ║
- ║       ▼                            Authority(child) ⊆ Authority(parent):           ║
- ║                                      actions · resources · audience ·              ║
- ║                                      amount cap · window · depth                   ║
- ║  4  Replay Protection          atomic CLAIM-ONCE (Redis SET NX PX)                ║
- ║       ▼                                                                          ║
- ║  5  VerifiedFacts              ONLY cryptographically established facts may      ║
+ ║                                    quarantine kill switch        any failure ─► DENY║
+ ║  4  Delegated Authority        Authority(child) ⊆ Authority(parent):               ║
+ ║       ▼                            actions · resources · audience ·                ║
+ ║                                    amount cap · window · depth (single link in P0) ║
+ ║  5  VerifiedFacts              ONLY cryptographically established facts may        ║
  ║       ▼                            cross this line                               ║
  ║  6  OPA Wasm Policy            deterministic · same input → same answer ·        ║
  ║                                    hash-pinned artifact                          ║
@@ -48,6 +48,13 @@ Three load-bearing properties:
    5000 SAR is denied `AUTHORITY_LIMIT_EXCEEDED` in the same minute.
 3. **Every dependency fails closed** — resolver, status, replay, policy,
    audit: an unavailable check denies; there is no permissive fallback.
+   (If the policy engine itself crashes the request is denied and nothing
+   executes, but no receipt is written.)
+
+P0 as built: one Next.js app composes these packages in-process; the gateway
+accepts a single delegation link, state is in-memory (replay claims in Redis),
+the demo clock is frozen at 2026-09-15T12:00:00Z, and the executor is a
+simulation.
 
 Implementation map: `packages/did · vc · status · delegation · replay ·
 policy · gateway · audit · trust-profile · attacks` · `apps/web` (view only).

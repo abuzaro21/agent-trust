@@ -22,7 +22,7 @@ All credentials are W3C Verifiable Credentials 2.0, signed as JWS with the `ES25
       "actions": ["refund:create"],
       "resources": ["tenant:acme"],
       "audience": ["did:web:payments.example:agent"],
-      "limits": { "amount": 500, "currency": "SAR", "perDay": 20 },
+      "limits": { "amount": 500, "currency": "SAR", "perDay": 20 },   // perDay: schema-valid, NOT enforced in P0
       "delegationDepth": 0
     }
   },
@@ -66,7 +66,7 @@ This invariant is enforced by the recursive delegation-chain verifier **before**
 ## Revocation
 
 - **W3C Bitstring Status List** is the revocation/suspension mechanism of record.
-- A local status index/cache (Postgres `Revocation` table) serves freshness with bounded lag; high-risk actions fail closed when the status source is unreachable and the cache is stale.
+- *(Target)* A local status index/cache (Postgres `Revocation` table) serves freshness with bounded lag; high-risk actions fail closed when the status source is unreachable and the cache is stale.
 - **Emergency quarantine** (`Quarantine` table + kill switch) stops an agent regardless of credential state — it is the operator's break-glass control, and every decision records whether it was active.
 
 ## Trust Rules
@@ -75,7 +75,9 @@ This invariant is enforced by the recursive delegation-chain verifier **before**
 2. The **Trusted Issuer Registry** decides which issuer DIDs are accepted, per credential type, per trust domain. Self-signed credentials from unregistered issuers are rejected as `UNTRUSTED_ISSUER`.
 3. Raw VC documents may be stored encrypted; the relational tables hold only indexes and normalized facts. **Private signing keys are never stored in the database.**
 
-## Data Model (relational index)
+## Data Model (relational index — target design)
+
+> Not built in P0: the demo keeps equivalent state in process memory (single replica, resets on restart).
 
 | Model | Key fields | Purpose |
 |---|---|---|
@@ -88,4 +90,4 @@ This invariant is enforced by the recursive delegation-chain verifier **before**
 | `Decision` | `decision_id`, `effect`, `reason_codes`, `failed_constraints`, `policy_hash`, `evidence_hash`, `request_hash` | Explainability/audit |
 | `ActionReceipt` | `event_id`, `actor_did`, `action`, `resource`, `request_hash`, `decision_id`, `previous_hash`, `event_hash`, `signature` | Tamper-evident provenance |
 | `Quarantine` | `agent_did`, `reason`, `activated_at`, `expires_at`, `operator` | Emergency kill switch |
-| `Approval` | `approval_id`, `approver`, `task_hash`, `constraints`, `expires_at`, `used_at` | Human-in-the-loop |
+| `Approval` | `approval_id`, `approver`, `task_hash`, `constraints`, `expires_at`, `used_at` | Human-in-the-loop *(P1, not implemented)* |

@@ -31,6 +31,8 @@ export class StatusListManager {
   readonly #store: StatusListStore;
   readonly #clock: () => number;
   readonly #assigned = new Map<string, Set<number>>();
+  /** Tail of each list's in-process mutation queue (see #serialize). */
+  readonly #queues = new Map<string, Promise<unknown>>();
 
   constructor(store: StatusListStore, opts: { clock?: () => number } = {}) {
     this.#store = store;
@@ -116,7 +118,34 @@ export class StatusListManager {
     }
   }
 
+  /**
+   * Serialize read-modify-write mutations of ONE list within this process so
+   * concurrent revoke/suspend calls cannot overwrite each other's bits.
+   * A rejected operation does not block the queue.
+   * ponytail: process-local only — it does NOT protect multiple writer
+   * processes; a shared store needs compare-and-swap on `version`.
+   */
+  #serialize<T>(listId: string, operation: () => Promise<T>): Promise<T> {
+    const run = (this.#queues.get(listId) ?? Promise.resolve()).then(operation, operation);
+    const tail = run.catch(() => undefined);
+    this.#queues.set(listId, tail);
+    void tail.then(() => {
+      if (this.#queues.get(listId) === tail) this.#queues.delete(listId);
+    });
+    return run;
+  }
+
   async #setBit(
+    listId: string,
+    index: number,
+    requiredPurpose: StatusPurpose,
+    value: boolean,
+    operation: 'revoke' | 'suspend' | 'unsuspend',
+  ): Promise<StatusList> {
+    return this.#serialize(listId, () => this.#applyBit(listId, index, requiredPurpose, value, operation));
+  }
+
+  async #applyBit(
     listId: string,
     index: number,
     requiredPurpose: StatusPurpose,

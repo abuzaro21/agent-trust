@@ -2,6 +2,29 @@
 
 > **Target architecture ≠ delivery architecture.** The theoretical design stays broad, but the live submission never depends on its riskiest components. Everything volatile sits behind a stable interface as a P1 adapter.
 
+## What is implemented vs. the target design
+
+This document describes the **target architecture** and marks what P0 actually built. Where the two
+differ, the table below is authoritative.
+
+| Topic | Target (this document) | Implemented in P0 |
+|---|---|---|
+| Runtime | Fastify Trust API + separate agents/credential service | One Next.js app (`apps/web`) whose route handlers call the library packages in-process; `apps/trust-gateway`, `credential-service`, `agent-alpha/beta` are empty placeholders |
+| Identity | `did:web` + `did:key`, `did:webvh` as P1 | `did:web` (hardened, SSRF-pinned) and `did:key` P-256 fixtures; no `did:webvh` |
+| Policy | Rego → Wasm, evidence incl. reputation inputs | Rego → Wasm, `VerifiedFacts`-only input; emits `ALLOW`/`DENY` (never `REQUIRE_APPROVAL`) |
+| Delegation | Multi-hop chains with attenuation | Chain walker/attenuator in `packages/delegation` (tested directly); **the gateway accepts a single delegation link** |
+| Limits | amount, currency, `perDay`, window, depth | amount, currency, window, depth enforced; **`perDay` is accepted but not enforced** |
+| Human approval | HITL via `REQUIRE_APPROVAL` | Not implemented (P1) |
+| Persistence | PostgreSQL | None — audit, status, profile state are in-memory and reset on restart; only replay claims are in Redis |
+| Provenance | Periodic signed checkpoints | A checkpoint is signed over the current chain when the audit/profile API is read |
+| Key custody | KMS/HSM `Signer` | Local ES256 signer; demo keys are deployment secrets |
+| Executor | Real enterprise API | `DemoRefundExecutor` — a simulation, no money moves |
+| Clock | Wall clock | Frozen demo clock `2026-09-15T12:00:00Z` in the demo app (tests use their own fixed clocks) |
+
+Failure behavior worth stating precisely: if the policy **engine throws**, the request is denied and the
+executor never runs, but no decision receipt is written (the receipt schema requires a real policy hash).
+Receipts are schema-validated *before* they are appended, so a malformed receipt can never corrupt the chain.
+
 ## The Core Decision
 
 We do not build a "reputation score for agents." We build a **Trust & Authorization Fabric** that can prove:
@@ -26,10 +49,10 @@ We do not build a "reputation score for agents." We build a **Trust & Authorizat
 | Policy | **Rego compiled to OPA Wasm, embedded in the Fastify process** behind `PolicyEngine` |
 | Workload identity | SPIFFE/SPIRE integration point only — not an MVP dependency |
 | Provenance | Append-only hash chain + signed checkpoints |
-| Database | PostgreSQL |
+| Database | PostgreSQL *(target — not built; P0 state is in-memory)* |
 | Replay protection | Redis atomic `SET NX EX` on `jti`; write actions **fail closed** when unavailable |
 | Key custody | `Signer` abstraction — P0 protected local/demo signer; Cloud KMS/HSM in P1 |
-| Backend | TypeScript + Fastify |
+| Backend | TypeScript + Fastify *(target — P0 runs the packages inside Next.js route handlers)* |
 | UI | Next.js |
 | Deployment | Web + Trust API (embedded OPA Wasm) + PostgreSQL + Redis in simple containers — no OPA network service |
 
@@ -78,6 +101,7 @@ Runs before policy; produces **verified facts**, not opinions:
 ```text
 resolve DID
 → prove key possession
+→ claim request nonce/JTI (atomic; right after PoP, before credential work)
 → verify VC signature
 → validate schema/type
 → validate issuer trust
@@ -86,7 +110,6 @@ resolve DID
 → check revocation
 → verify parent delegation chain
 → enforce attenuation
-→ validate request nonce/JTI (atomic)
 → build verified evidence
 ```
 
@@ -110,7 +133,7 @@ PolicyEngine.evaluate(input)
 
 Every decision records `policyVersion` and `policyHash`. If the bundle is missing, invalid, or fails to initialize, **write actions are denied** — there is no permissive fallback. Rego receives only pre-verified facts; it is never a cryptographic parser.
 
-Example policy input (verified facts + request context):
+Illustrative **target** policy input (the implemented `VerifiedFacts` shape is `packages/schemas/src/schemas/verified-facts.schema.ts`; it carries no reputation counters):
 
 ```json
 {
@@ -137,7 +160,7 @@ Every action produces an **ActionReceipt** in an append-only hash chain:
 eventHash = SHA-256(previousEventHash || canonical(eventPayload))
 ```
 
-Checkpoints are signed periodically. Deleting or editing any old event breaks the entire chain after it. Raw conversations and PII never enter the chain — and never enter any public ledger. External transparency anchoring (digest-only, Sigstore/Rekor pattern) is optional and off by default.
+Checkpoints are signed over the chain (in P0, when the audit/profile API is read). Deleting or editing any old event breaks the entire chain after it. Raw conversations and PII never enter the chain — and never enter any public ledger. External transparency anchoring (digest-only, Sigstore/Rekor pattern) is optional and off by default.
 
 ## The Security Boundary That Matters
 
@@ -160,7 +183,7 @@ P0 / Delivery
   W3C VC + real JWS verification · scoped delegation + attenuation
   real revocation · Redis atomic replay protection
   Rego → OPA Wasm embedded in Fastify
-  Postgres + tamper-evident receipts · two real agents · trust-gated action
+  in-memory (P0) / Postgres (target) + tamper-evident receipts · two demo agents · trust-gated simulated action
 
 P1 / Optional differentiators
   did:webvh resolver adapter · Cloud KMS/HSM signer

@@ -21,7 +21,7 @@ export {
   receiptEventHash,
 } from './hash.js';
 
-export { InMemoryAuditLog } from './memory-log.js';
+export { AuditReceiptInvalidError, InMemoryAuditLog } from './memory-log.js';
 
 export {
   authorityDigestOf,
