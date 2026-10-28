@@ -33,7 +33,7 @@ Nothing vague; every row is clickable or runnable.
 | Dimension | Best evidence |
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
-| **Technical depth (25)** | 504 tests in the default run (435 package + 66 apps/web; OPA on PATH needed for all 501) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Technical depth (25)** | 504 tests in the default run (435 package + 69 apps/web; OPA on PATH needed for all 504) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
 | **Demo quality (20)** | Judge-first dashboard: hero, principals + signed grant, the 120-vs-5,000 SAR decision with a large verdict, a real-order pipeline, failure cards, lifecycle, evidence; 10 screenshots regenerated from the current UI (desktop + mobile); responsive at 1920/1440/768/390 px with 43 automated browser checks; optional video script (once recorded on the public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
