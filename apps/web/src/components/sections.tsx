@@ -477,13 +477,15 @@ export function Comparison({ runs }: { runs: Runs }) {
   if (a === undefined || b === undefined) return null;
   const va = verdictFor(a.evaluation.result);
   const vb = verdictFor(b.evaluation.result);
-  const rel = comparisonOf(va, vb);
+  const rel = comparisonOf(a.evaluation.result, b.evaluation.result);
   return (
     <div className="compare-wrap" aria-labelledby="compare-title">
       <h3 className="compare-title" id="compare-title">
-        {rel === 'different'
+        {rel === 'different-decision'
           ? 'Same agent. Same credential. Different amount — different decision.'
-          : 'Same agent. Same credential. Both requests received the same outcome.'}
+          : rel === 'different-outcome'
+            ? 'Same agent. Same credential. Different amount — the authorization matched, the outcome did not.'
+            : 'Same agent. Same credential. Both requests received the same outcome.'}
       </h3>
       <div className="compare" aria-label="The two requests side by side">
         {[

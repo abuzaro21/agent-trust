@@ -49,11 +49,15 @@ async function open(width, height, { reducedMotion = false, intercept, path = '/
   if (reducedMotion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   page._errors = [];
   page._evaluateRequests = 0;
+  page._bodies = [];
   page.on('pageerror', (e) => page._errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && page._errors.push(m.text()));
   await page.setRequestInterception(true);
   page.on('request', (req) => {
-    if (req.method() === 'POST' && req.url().endsWith('/api/trust/evaluate')) page._evaluateRequests += 1;
+    if (req.method() === 'POST' && req.url().endsWith('/api/trust/evaluate')) {
+      page._evaluateRequests += 1;
+      page._bodies.push(req.postData() ?? '');
+    }
     if (intercept !== undefined && intercept(req)) return;
     req.continue();
   });
@@ -84,6 +88,7 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   const wide = await page.evaluate(() => [...document.querySelectorAll('main *')].filter((e) => e.getBoundingClientRect().right > document.documentElement.clientWidth + 1).slice(0, 3).map((e) => e.tagName + '.' + e.className));
   check(`${w}px: no element extends past the viewport`, wide.length === 0, wide.join(', '));
   if (w === 1440) {
+    await page.keyboard.press('Tab'); // the real first Tab stop, not a scripted focus()
     const s = await page.evaluate(() => {
       const levels = [...document.querySelectorAll('h1,h2,h3,h4')].map((e) => Number(e.tagName[1]));
       let skip = false;
@@ -99,7 +104,8 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
         nav: document.querySelectorAll('nav[aria-label]').length,
         lang: document.documentElement.lang,
         h1Text: document.querySelector('h1')?.textContent,
-        firstFocus: (() => { document.querySelector('.skip-link')?.focus(); return document.activeElement?.className ?? ''; })(),
+        firstFocus: document.activeElement?.className ?? '',
+        skipTarget: (() => { const h = document.querySelector('.skip-link')?.getAttribute('href') ?? ''; return h.startsWith('#') ? document.querySelector(h)?.tagName ?? '' : ''; })(),
         unlabeledButtons: [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === '' && !b.getAttribute('aria-label')).length,
         unlabeledInputs: [...document.querySelectorAll('input')].filter((i) => !i.labels?.length && !i.getAttribute('aria-label')).length,
         simulatedLabel: document.body.innerText.includes('Simulated refund executor'),
@@ -119,7 +125,7 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
     });
     check('one <h1> "Trust is a grant, not a score.", no skipped heading levels', s.h1 === 1 && !s.skip && s.h1Text === 'Trust is a grant, not a score.', JSON.stringify(s));
     check('landmarks: header, main, footer, labelled nav; lang=en', s.main === 1 && s.header >= 1 && s.footer === 1 && s.nav >= 1 && s.lang === 'en', JSON.stringify(s));
-    check('skip link is focusable and first (targets #main)', s.firstFocus.includes('skip-link'), JSON.stringify(s.firstFocus));
+    check('the FIRST Tab stop is the skip link and it targets <main>', s.firstFocus.includes('skip-link') && s.skipTarget === 'MAIN', JSON.stringify({ f: s.firstFocus, t: s.skipTarget }));
     check('every button and input has an accessible name', s.unlabeledButtons === 0 && s.unlabeledInputs === 0, JSON.stringify(s));
     check('executor is labelled as simulated on the page', s.simulatedLabel);
     check('no trust score is rendered', !s.noScoreWords);
@@ -396,7 +402,9 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   await page.type('#amount', '250');
   await (await buttonByText(page, '^evaluate this amount$')).click();
   await waitVerdict(page, 'Authorized');
-  check('a valid custom amount (250) is evaluated by the backend and authorized', true);
+  const sent = JSON.parse(page._bodies.at(-1) ?? '{}');
+  const shown = await verdictText(page);
+  check('a valid custom amount (250) is SENT as 250 and the response for 250 is shown', sent.amount === 250 && /250 SAR refund request/.test(shown) && /Authorized/.test(shown), JSON.stringify({ sent, shown: shown.slice(0, 80) }));
   await page.close();
 }
 

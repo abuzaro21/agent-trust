@@ -285,6 +285,33 @@ describe('authorization and execution are reported as two separate facts', () =>
     const s = decisionSplit(decision({ effect: undefined, outcome: 'REJECTED', reasonCodes: ['REQUEST_MALFORMED'], stages: { ...SPOOF_STAGES, identity: 'NOT_RUN' } }));
     expect(s.authorization.tone).toBe('warn');
   });
+  it('audit veto (real gateway shape): policy ALLOWED, a receipt could not be written, nothing ran — never "policy never ran"', () => {
+    const d = decision({ reasonCodes: ['AUDIT_LOG_UNAVAILABLE'], stages: { ...ALLOW_STAGES, audit: 'FAIL', execution: 'NOT_RUN' }, decisionReceiptId: undefined });
+    const s = decisionSplit(d);
+    expect(s.authorization).toMatchObject({ tone: 'warn', label: 'Allowed by policy, then stopped' });
+    expect(s.authorization.detail).not.toMatch(/never ran/);
+    expect(s.execution.label).toBe('Not run');
+    expect(verdictFor(d).kind).toBe('deny'); // the gateway outcome is DENIED
+  });
+  it('malformed request with every stage NOT_RUN: no authorization decision, and no claim that a verification step failed', () => {
+    const allNotRun = { identity: 'NOT_RUN', replay: 'NOT_RUN', credential: 'NOT_RUN', authority: 'NOT_RUN', policy: 'NOT_RUN', audit: 'NOT_RUN', execution: 'NOT_RUN' };
+    const s = decisionSplit(decision({ outcome: 'DENIED', effect: 'DENY', reasonCodes: ['REQUEST_MALFORMED'], stages: allNotRun, decisionReceiptId: undefined }));
+    expect(s.authorization.label).toBe('No authorization decision');
+    expect(s.authorization.detail).not.toMatch(/verification step failed/);
+  });
+  it('policy engine failure: "Policy could not decide", not "denied before policy"', () => {
+    const s = decisionSplit(decision({ reasonCodes: ['POLICY_EVALUATION_ERROR'], stages: { ...ALLOW_STAGES, policy: 'FAIL', audit: 'NOT_RUN', execution: 'NOT_RUN' }, decisionReceiptId: undefined }));
+    expect(s.authorization.label).toBe('Policy could not decide');
+  });
+  it('EXECUTION_FAILED: authorized by policy, execution failed — and the verdict is NOT a denial', () => {
+    const d = decision({ outcome: 'EXECUTION_FAILED', effect: 'ALLOW', reasonCodes: ['IDENTITY_VERIFIED'], stages: { ...ALLOW_STAGES, execution: 'FAILED' }, executionReceiptId: 'rcpt_out_t1' });
+    const s = decisionSplit(d);
+    expect(s.authorization.label).toBe('Allowed by policy');
+    expect(s.execution).toMatchObject({ tone: 'deny', label: 'Failed (simulated)' });
+    const v = verdictFor(d);
+    expect(v.kind).toBe('failed');
+    expect(v.headline).not.toBe('Denied');
+  });
 });
 
 describe('verification summary and comparison are read from the responses', () => {
@@ -292,13 +319,24 @@ describe('verification summary and comparison are read from the responses', () =
     expect(verificationSummary(decision({}))).toEqual({ passed: 4, total: 4 });
     expect(verificationSummary(decision({ stages: SPOOF_STAGES }))).toEqual({ passed: 0, total: 4 });
   });
-  it('comparison is pending until both verdicts exist and then follows ONLY the two verdicts', () => {
-    const allow = verdictFor(decision({ outcome: 'AUTHORIZED', effect: 'ALLOW', reasonCodes: [], stages: ALLOW_STAGES }));
-    const deny = verdictFor(decision({}));
+  it('comparison is pending until both responses exist and then follows ONLY the two responses', () => {
+    const allow = decision({ outcome: 'AUTHORIZED', effect: 'ALLOW', reasonCodes: ['IDENTITY_VERIFIED'], stages: ALLOW_STAGES });
+    const deny = decision({});
     expect(comparisonOf(allow, undefined)).toBe('pending');
     expect(comparisonOf(undefined, deny)).toBe('pending');
-    expect(comparisonOf(allow, deny)).toBe('different');
+    expect(comparisonOf(allow, deny)).toBe('different-decision');
     expect(comparisonOf(deny, deny)).toBe('same'); // never claims "different decision" when the backend returned the same outcome
+  });
+  it('an authorized-but-failed execution is a different OUTCOME from a success, and a different DECISION from a denial', () => {
+    const ok = decision({ outcome: 'AUTHORIZED', effect: 'ALLOW', reasonCodes: ['IDENTITY_VERIFIED'], stages: ALLOW_STAGES });
+    const failed = decision({ outcome: 'EXECUTION_FAILED', effect: 'ALLOW', reasonCodes: ['IDENTITY_VERIFIED'], stages: { ...ALLOW_STAGES, execution: 'FAILED' } });
+    expect(comparisonOf(ok, failed)).toBe('different-outcome');
+    expect(comparisonOf(failed, decision({}))).toBe('different-decision');
+  });
+  it('two denials for different reasons are not reported as the same outcome', () => {
+    const limit = decision({});
+    const spoof = decision({ reasonCodes: ['IDENTITY_PROOF_INVALID'], stages: SPOOF_STAGES });
+    expect(comparisonOf(limit, spoof)).toBe('different-outcome');
   });
 });
 

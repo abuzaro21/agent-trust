@@ -138,7 +138,7 @@ export function stoppedAt(groups: PipelineGroupView[]): PipelineStepView | undef
 // ---------------------------------------------------------------- verdict
 
 export interface Verdict {
-  kind: 'allow' | 'deny' | 'uncertain';
+  kind: 'allow' | 'deny' | 'uncertain' | 'failed';
   tone: 'ok' | 'deny' | 'warn';
   headline: string;
   code: string;
@@ -157,6 +157,16 @@ export function verdictFor(decision: DecisionDto, ctx: { requested?: number; lim
     };
   }
   const primary = decision.reasonCodes[0];
+  if (decision.effect === 'ALLOW' && decision.outcome === 'EXECUTION_FAILED') {
+    // Authorized by policy, but the simulated executor reported a failure: not a denial.
+    return {
+      kind: 'failed',
+      tone: 'warn',
+      headline: 'Authorized — execution failed',
+      code: decision.outcome,
+      sentence: 'Policy authorized this request, but the simulated executor reported a failure. The failure is recorded as a separate outcome receipt.',
+    };
+  }
   if (decision.outcome === 'EXECUTION_UNCERTAIN') {
     return { kind: 'uncertain', tone: 'warn', headline: 'Execution uncertain', code: primary ?? decision.outcome, sentence: explainReason(primary, ctx) };
   }
@@ -267,14 +277,24 @@ export interface FactView {
  */
 export function decisionSplit(decision: DecisionDto): { authorization: FactView; execution: FactView } {
   const policy = decision.stages.policy;
-  const authorization: FactView =
-    decision.effect === 'ALLOW'
-      ? { tone: 'ok', label: 'Allowed by policy', detail: 'The deterministic policy found the request inside the verified authority.' }
-      : decision.effect === 'DENY' && policy === 'DENY'
-        ? { tone: 'deny', label: 'Denied by policy', detail: 'Every verification step passed; the policy refused this specific request.' }
-        : decision.effect === 'DENY'
-          ? { tone: 'deny', label: 'Denied before policy', detail: 'A verification step failed, so policy never ran.' }
-          : { tone: 'warn', label: 'No authorization decision', detail: 'The request did not reach a policy decision.' };
+  const verificationFailed = ['identity', 'replay', 'credential', 'authority'].some((k) => FAIL_VALUES.has(decision.stages[k as keyof DecisionDto['stages']]));
+  let authorization: FactView;
+  if (decision.effect === 'ALLOW') {
+    authorization = { tone: 'ok', label: 'Allowed by policy', detail: 'The deterministic policy found the request inside the verified authority.' };
+  } else if (decision.effect !== 'DENY') {
+    authorization = { tone: 'warn', label: 'No authorization decision', detail: 'The request did not reach a policy decision.' };
+  } else if (policy === 'DENY') {
+    authorization = { tone: 'deny', label: 'Denied by policy', detail: 'Every verification step passed; the policy refused this specific request.' };
+  } else if (policy === 'ALLOW') {
+    // e.g. AUDIT_LOG_UNAVAILABLE: policy said ALLOW, but nothing may run without a durable decision receipt.
+    authorization = { tone: 'warn', label: 'Allowed by policy, then stopped', detail: 'The policy allowed it, but a required receipt could not be written, so the gateway did not run it.' };
+  } else if (FAIL_VALUES.has(policy)) {
+    authorization = { tone: 'deny', label: 'Policy could not decide', detail: 'The policy engine failed, so the request was denied rather than guessed at.' };
+  } else if (verificationFailed) {
+    authorization = { tone: 'deny', label: 'Denied before policy', detail: 'A verification step failed, so policy never ran.' };
+  } else {
+    authorization = { tone: 'warn', label: 'No authorization decision', detail: 'The request did not reach a policy decision (for example, it failed input validation).' };
+  }
 
   const raw = decision.stages.execution;
   const recorded = decision.executionReceiptId !== undefined;
@@ -304,12 +324,17 @@ export function verificationSummary(decision: DecisionDto): { passed: number; to
 }
 
 /**
- * How two real responses relate: derived only from the two verdicts the
- * backend produced. 'pending' until both exist.
+ * How two real responses relate: derived only from the two GatewayResults.
+ * 'pending' until both exist. The authorization decision (effect) and the
+ * final outcome are different facts, so they are compared separately.
  */
-export function comparisonOf(a: Verdict | undefined, b: Verdict | undefined): 'pending' | 'different' | 'same' {
+export function comparisonOf(
+  a: DecisionDto | undefined,
+  b: DecisionDto | undefined,
+): 'pending' | 'different-decision' | 'different-outcome' | 'same' {
   if (a === undefined || b === undefined) return 'pending';
-  return a.kind === b.kind ? 'same' : 'different';
+  if (a.effect !== b.effect) return 'different-decision';
+  return a.outcome === b.outcome && a.reasonCodes.join() === b.reasonCodes.join() ? 'same' : 'different-outcome';
 }
 
 /** The three failure demonstrations shown first; the rest sit behind a disclosure. */
