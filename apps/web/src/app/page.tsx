@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   Architecture,
-  DemoPanel,
+  Comparison,
+  DecisionStage,
   EvidenceSection,
   FailureExamples,
   Footer,
   Hero,
-  IdentityAuthority,
   Lifecycle,
-  ReportSummary,
+  SectionHead,
   TopBar,
   type DemoStatus,
   type RunRecord,
@@ -145,7 +145,10 @@ export default function Page() {
 
   const scrollToVerdict = useCallback(() => {
     requestAnimationFrame(() => {
-      document.getElementById('verdict-anchor')?.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+      // Stacked (phone/tablet) layout: the verdict sits below the buttons, so align it to the top of the screen.
+      // Focus is never moved — it stays on the button that was pressed, so keyboard users keep their place.
+      const stacked = window.matchMedia('(max-width: 899px)').matches;
+      document.getElementById('verdict-anchor')?.scrollIntoView({ block: stacked ? 'start' : 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
     });
   }, []);
 
@@ -238,51 +241,39 @@ export default function Page() {
 
   return (
     <div className="page">
-      <TopBar status={status} />
+      <TopBar />
 
       <main id="main">
-        <Hero onCompare={() => void runBoth()} busy={running === 'both'} />
+        <Hero />
 
         {bootError !== null && (
-          <div className="err" role="alert" style={{ marginTop: 'var(--s5)' }}>
+          <div className="err" role="alert" style={{ marginBottom: 'var(--s5)' }}>
             <strong>Backend not ready.</strong> {bootError}{' '}
             <button type="button" className="btn btn--small" onClick={() => { setBootError(null); void refresh(); }}>Retry</button>
           </div>
         )}
 
-        <div className="section" id="identity" aria-labelledby="identity-h">
-          <div className="section-head">
-            <div className="eyebrow">1 · Identity, authority and the live decision</div>
-            <h2 id="identity-h">Who is asking, what were they granted, and what happens at the limit?</h2>
-          </div>
-          <div className="grid-2" id="demo">
-            <IdentityAuthority profile={profile} status={status} />
-            <DemoPanel
-              profile={profile}
-              runs={runs}
-              last={last}
-              running={running}
-              error={errorPrimary}
-              amount={amount}
-              amountError={amountError}
-              onAmount={(v) => { setAmount(v); setAmountError(null); }}
-              onRun={(id) => void runPrimary(id)}
-              onCustom={runCustom}
-              onBoth={() => void runBoth()}
-              onRetry={retryLast}
-            />
-          </div>
-        </div>
+        <DecisionStage
+          profile={profile}
+          status={status}
+          runs={runs}
+          last={last}
+          running={running}
+          error={errorPrimary}
+          amount={amount}
+          amountError={amountError}
+          onAmount={(v) => { setAmount(v); setAmountError(null); }}
+          onRun={(id) => void runPrimary(id)}
+          onCustom={runCustom}
+          onBoth={() => void runBoth()}
+          onRetry={retryLast}
+        />
+        <Comparison runs={runs} />
 
         <section className="section" id="failures" aria-labelledby="failures-h">
-          <div className="section-head">
-            <div className="eyebrow">2 · Failure thinking</div>
-            <h2 id="failures-h">What happens when something is wrong?</h2>
-            <p>
-              Each case below is a real request through the same gateway and must be denied. (In the replay case the first send is legitimate — one authorization, one execution —
-              and only the identical re-send must be refused.) The 60-scenario suite checks each scenario&apos;s side-effect invariants too, for example that the executor did not run on a denial.
-            </p>
-          </div>
+          <SectionHead id="failures-h" eyebrow="Failure thinking" title="What if something is wrong?">
+            Each case is a real request through the same gateway and must be denied. (In the replay case the first send is legitimate — one authorization, one execution — and only the identical re-send must be refused.)
+          </SectionHead>
           {errorOther !== null && (
             <div className="err" role="alert" style={{ marginBottom: 'var(--s4)' }}>
               <strong>The request could not be completed.</strong> <span className="mono wrap-any">{errorOther}</span>
@@ -292,37 +283,27 @@ export default function Page() {
         </section>
 
         <section className="section" id="lifecycle" aria-labelledby="life-h">
-          <div className="section-head">
-            <div className="eyebrow">3 · Grant · scope · revoke</div>
-            <h2 id="life-h">How trust is granted, narrowed and withdrawn</h2>
-            <p>The lifecycle of one delegation, with every step tied to something you can run or a test that proves it.</p>
-          </div>
+          <SectionHead id="life-h" eyebrow="Grant · scope · revoke" title="How trust is granted, narrowed and withdrawn">
+            One delegation, three steps — each tied to something you can run or a test that proves it.
+          </SectionHead>
           <Lifecycle profile={profile} runs={runs} running={running} onRun={(id) => void runOther(id)} />
         </section>
 
         <section className="section" id="evidence" aria-labelledby="ev-h">
-          <div className="section-head">
-            <div className="eyebrow">4 · Trust profile evidence</div>
-            <h2 id="ev-h">Credentials, attestations and an audit trail you can check</h2>
-          </div>
+          <SectionHead id="ev-h" eyebrow="Evidence" title="Proof you can check" />
           {evidenceStale && (
             <div className="callout" role="status" style={{ marginBottom: 'var(--s4)' }}>
               <strong>The evidence panels could not be refreshed after the last request,</strong> so they may not include it.{' '}
               <button type="button" className="btn btn--small" onClick={() => void reloadEvidence()}>Reload evidence</button>
             </div>
           )}
-          <EvidenceSection profile={profile} audit={audit} status={status} />
-          <div style={{ marginTop: 'var(--s4)' }}>
-            <ReportSummary report={report} error={reportError} />
-          </div>
+          <EvidenceSection profile={profile} audit={audit} status={status} report={report} reportError={reportError} />
         </section>
 
         <section className="section" id="architecture" aria-labelledby="arch-h">
-          <div className="section-head">
-            <div className="eyebrow">5 · Architecture and standards</div>
-            <h2 id="arch-h">Identity → claims → verification → policy</h2>
-            <p>Every step runs in the trusted backend. This page only renders what the gateway already decided.</p>
-          </div>
+          <SectionHead id="arch-h" eyebrow="Architecture" title="Identity → claims → verification → policy">
+            Every step runs in the trusted backend. This page only renders what the gateway already decided.
+          </SectionHead>
           <Architecture />
         </section>
       </main>

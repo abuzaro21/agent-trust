@@ -1,6 +1,6 @@
 # 90-Second Walkthrough Script
 
-The challenge lists the 90-second video as **optional but recommended**; the live demo URL is the required part. This script targets the redesigned dashboard (buttons "120 SAR" / "5,000 SAR" in the demo panel; failure cases as cards).
+The challenge lists the 90-second video as **optional but recommended**; the live demo URL is the required part. This script targets the single-stage UI: one decision stage (grant strip, two request buttons "120 SAR" / "5,000 SAR", verdict), a side-by-side comparison, then three failure cards. Light theme is the default.
 
 **Target: 85–90 seconds.** The narration below is **167 tokens**
 (`wc -w` of the quoted lines, em-dashes counted; 162 words). At a calm 145
@@ -35,7 +35,9 @@ Recording rules:
   authority → policy; narrate it in that order.
 - "Sixty scenarios" = 52 attacks + 8 failure demos; do not call all sixty "attacks" or "adversarial".
 - Say "signed, hash-chained history", not "verifiable history" — checkpoints have no independent anchor.
-- The demo has no issue/revoke controls on purpose; the *Revoke* lifecycle step runs on an isolated credential. Do not imply a visitor can revoke the main grant.
+- The demo has no issue/revoke controls on purpose; the *Revoke* step in "Grant · scope · revoke" runs on an isolated credential. Do not imply a visitor can revoke the main grant.
+- Authorization (the policy decision) and execution (the simulated refund) are two separate facts on screen; say "authorized, and the simulated refund ran" — not "approved and paid".
+- Only three failure cases are on screen by default; the other three (quarantine, wrong audience, tampered request) are one click away under "3 more failure cases".
 - The audit log is one shared demo log (all visitors) with a frozen clock; do not present its timestamps as real time.
 - Receipt timestamps come from the frozen demo clock (2026-09-15T12:00:00Z).
 - "Sixty scenarios" is read from the `/attacks` page (a build-time report), not computed on screen.
@@ -44,19 +46,18 @@ Recording rules:
 ---
 
 ## 0:00–0:08 — The problem
-**Show:** the hero ("Trust is not a score") and the one-line contrast; the top bar shows the live `did:web` and Redis chips.
+**Show:** the hero ("Trust is a grant, not a score.") and the decision stage underneath it: AcmeOrg ▶ "may refund up to 500 SAR" ▶ SupportAgent.
 
 > "Agents will soon act for companies. Knowing who one is doesn't say what it may do."
 
 ## 0:08–0:18 — The trust model
-**Show:** scroll to *Who is asking*; highlight boxes (not a drawn cursor) step through the three principals, the DID line (`did:web:abuzaro21.github.io:agents:support`, "✓ DID resolved"),
-the "What it is allowed to do" card (`≤ 500 SAR`, evidence digest) and the "not by this page and not by history" line.
+**Show:** highlight boxes (not a drawn cursor) step through the grant strip — AcmeOrg, the `≤ 500 SAR` signed delegation (read from the backend), SupportAgent "✓ DID resolved" — then open "Credential and identity details" (DIDs, evidence digest) for one beat and close it.
 
 > "No trust score. Trust is evidence: a did:web identity, signed credentials,
 > scoped authority, current revocation status, signed hash-chained history."
 
 ## 0:18–0:35 — ALLOW
-**Show:** click **120 SAR** → green "Authorized · WITHIN_AUTHORITY" verdict; the stepper shows eight steps in the real order, all PASS, execution "SUCCEEDED (simulated)".
+**Show:** click **120 SAR** → green "Authorized · WITHIN_AUTHORITY"; two separate rows read "Authorization: Allowed by policy" and "Execution: Succeeded (simulated)". Open "How it was decided" for the eight real steps, all PASS.
 
 > "This Support Agent may refund up to five hundred SAR. A hundred-and-twenty
 > request passes identity, replay, credential and revocation checks, then
@@ -64,14 +65,14 @@ the "What it is allowed to do" card (`≤ 500 SAR`, evidence digest) and the "no
 > receipts."
 
 ## 0:35–0:50 — Contextual DENY
-**Show:** click **5,000 SAR** → red "Denied · AUTHORITY_LIMIT_EXCEEDED" with the 5,000 / 500 SAR bar; the stepper shows verification 4 of 4 passed, **Policy decision** DENY, execution and outcome receipt not run; the side-by-side strip now holds both requests.
+**Show:** click **5,000 SAR** → red "Denied · AUTHORITY_LIMIT_EXCEEDED" with the 5,000 / 500 SAR bar; "Authorization: Denied by policy", "Execution: Not run — nothing was executed", "4 of 4 verification steps passed · Policy: DENY". The side-by-side comparison now appears under the stage: ✓ 120 SAR Authorized / ✕ 5,000 SAR Denied (built from the two real responses).
 
 > "Same agent, same valid credential — only the number changed. Five thousand
 > exceeds the delegation: DENY, authority limit exceeded. The agent can be
 > trusted, but not for this action."
 
 ## 0:50–1:00 — Spoof
-**Show:** scroll to *What happens when something is wrong?* → the **Spoofed agent** card → "Run this case" → Denied · IDENTITY_PROOF_INVALID; open "Show the pipeline": Identity is the first and only step that ran.
+**Show:** scroll to *What if something is wrong?* → the **Spoofed agent** card → "Run this case" → Denied · IDENTITY_PROOF_INVALID; open "Show the pipeline": Identity is the first and only step that ran.
 
 > "An impostor claims the Support Agent's DID but signs with its own key.
 > Identity fails; policy never runs."
@@ -89,7 +90,7 @@ the "What it is allowed to do" card (`≤ 500 SAR`, evidence digest) and the "no
 > execution."
 
 ## 1:18–1:30 — Evidence / close
-**Show:** (optional glance at the *Security test suite* card: 60 / 60) → open `/attacks`, hold on the 60/60 summary and the "generated at image build time" note, then back to the demo.
+**Show:** the *Security test suite* card under Evidence (60 / 60, "generated when the image was built") → open `/attacks`, hold on the 60/60 summary, then back to the demo. Optional: open "Signed audit history" to show the chain-intact chips and the honest-log note.
 
 > "Sixty security scenarios, each judged on reason code and side effects.
 > Trust isn't a score — it's verifiable, scoped, revocable authority."

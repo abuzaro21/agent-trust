@@ -7,11 +7,15 @@ import { ATTACK_REGISTRY } from '@agent-trust/attacks';
 
 import type { DecisionDto, ProfileDto } from '../src/lib/dto';
 import {
+  COMPACT_LIFECYCLE_KEYS,
   FAILURE_SCENARIOS,
   LIFECYCLE,
+  PRIMARY_FAILURE_IDS,
   PIPELINE_STEPS,
   PRIMARY_SCENARIOS,
   amountMeter,
+  comparisonOf,
+  decisionSplit,
   explainReason,
   limitFromProfile,
   pipelineView,
@@ -19,6 +23,7 @@ import {
   stagesToView,
   stoppedAt,
   verdictFor,
+  verificationSummary,
 } from '../src/lib/presentation';
 import { POST as evaluate } from '../src/app/api/trust/evaluate/route';
 
@@ -248,6 +253,65 @@ describe('the frontend makes no security decisions', () => {
     for (const f of files) {
       expect(readFileSync(f, 'utf8'), f).not.toMatch(/trustScore|reputationScore|riskScore/);
     }
+  });
+});
+
+describe('authorization and execution are reported as two separate facts', () => {
+  it('ALLOW: authorized by policy AND the simulated execution succeeded with a recorded outcome receipt', () => {
+    const d = decision({ outcome: 'AUTHORIZED', effect: 'ALLOW', reasonCodes: [], stages: ALLOW_STAGES, executionReceiptId: 'rcpt_exec_t1' });
+    const s = decisionSplit(d);
+    expect(s.authorization).toMatchObject({ tone: 'ok', label: 'Allowed by policy' });
+    expect(s.execution).toMatchObject({ tone: 'ok', label: 'Succeeded (simulated)' });
+    expect(s.execution.detail).toMatch(/No money moves/);
+  });
+  it('policy DENY: denied by policy, execution not run, nothing executed', () => {
+    const s = decisionSplit(decision({}));
+    expect(s.authorization).toMatchObject({ tone: 'deny', label: 'Denied by policy' });
+    expect(s.execution).toMatchObject({ tone: 'neutral', label: 'Not run' });
+    expect(s.execution.detail).toBe('Nothing was executed.');
+  });
+  it('spoof: denied BEFORE policy (policy never ran)', () => {
+    const s = decisionSplit(decision({ reasonCodes: ['IDENTITY_PROOF_INVALID'], stages: SPOOF_STAGES, decisionReceiptId: undefined }));
+    expect(s.authorization.label).toBe('Denied before policy');
+    expect(s.execution.label).toBe('Not run');
+  });
+  it('EXECUTION_UNCERTAIN: authorization stands but the execution is reported uncertain, not succeeded', () => {
+    const d = decision({ outcome: 'EXECUTION_UNCERTAIN', effect: 'ALLOW', reasonCodes: ['AUDIT_OUTCOME_UNRECORDED'], stages: { ...ALLOW_STAGES, audit: 'FAIL' } });
+    const s = decisionSplit(d);
+    expect(s.authorization.label).toBe('Allowed by policy');
+    expect(s.execution).toMatchObject({ tone: 'warn', label: 'Uncertain (simulated)' });
+  });
+  it('a decision without an effect is never presented as allowed or denied by policy', () => {
+    const s = decisionSplit(decision({ effect: undefined, outcome: 'REJECTED', reasonCodes: ['REQUEST_MALFORMED'], stages: { ...SPOOF_STAGES, identity: 'NOT_RUN' } }));
+    expect(s.authorization.tone).toBe('warn');
+  });
+});
+
+describe('verification summary and comparison are read from the responses', () => {
+  it('counts verification steps from the reported stages', () => {
+    expect(verificationSummary(decision({}))).toEqual({ passed: 4, total: 4 });
+    expect(verificationSummary(decision({ stages: SPOOF_STAGES }))).toEqual({ passed: 0, total: 4 });
+  });
+  it('comparison is pending until both verdicts exist and then follows ONLY the two verdicts', () => {
+    const allow = verdictFor(decision({ outcome: 'AUTHORIZED', effect: 'ALLOW', reasonCodes: [], stages: ALLOW_STAGES }));
+    const deny = verdictFor(decision({}));
+    expect(comparisonOf(allow, undefined)).toBe('pending');
+    expect(comparisonOf(undefined, deny)).toBe('pending');
+    expect(comparisonOf(allow, deny)).toBe('different');
+    expect(comparisonOf(deny, deny)).toBe('same'); // never claims "different decision" when the backend returned the same outcome
+  });
+});
+
+describe('information architecture', () => {
+  it('three primary failure demonstrations, each a real preset; the rest sit behind a disclosure', () => {
+    expect([...PRIMARY_FAILURE_IDS]).toEqual(['spoof', 'revoked', 'replay']);
+    const ids = FAILURE_SCENARIOS.map((s) => s.id);
+    for (const id of PRIMARY_FAILURE_IDS) expect(ids).toContain(id);
+    expect(ids.length - PRIMARY_FAILURE_IDS.length).toBe(3);
+  });
+  it('the compact lifecycle is grant / scope / revoke and each step exists', () => {
+    expect([...COMPACT_LIFECYCLE_KEYS]).toEqual(['grant', 'scope', 'revoke']);
+    for (const k of COMPACT_LIFECYCLE_KEYS) expect(LIFECYCLE.some((s) => s.key === k)).toBe(true);
   });
 });
 

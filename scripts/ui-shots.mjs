@@ -38,7 +38,7 @@ for (const vp of VIEWPORTS) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(base + '/', { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => document.body.innerText.includes('did:web'), { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => /may refund up to/.test(document.body.innerText), { timeout: 20000 }).catch(() => {});
   const metrics = async (state) => {
     const m = await page.evaluate(() => ({
       scrollW: document.documentElement.scrollWidth,

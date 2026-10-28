@@ -2,7 +2,7 @@
 
 **A Trust & Authorization Fabric for AI agents — verifiable identity, scoped delegation, revocable authority, and deterministic policy enforcement.**
 
-> **Trust is not a score. It is verifiable, scoped, revocable authority.**
+> **Trust is a grant, not a score — verifiable, scoped, revocable authority.**
 
 ## Live Demo
 
@@ -39,20 +39,23 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
   in `packages/delegation` (tested directly) but are not presentable through the gateway in P0.
 
 **60/60 adversarial security scenarios pass** at image build time (see the
-[Security Tests view](docs/screenshots/10-security-tests.png)): identity
+[Security Tests view](docs/screenshots/17-security-tests.png)): identity
 spoofing, tampered proofs, audience confusion, delegation widening, revocation
 bypass, replay, provider outages, DID-transport abuse — each judged not only on
 the denial reason but on side-effect invariants (the executor really did not
 run; the victim really was not attributed).
 
+One screen, one decision. Every state below was produced by clicking the real buttons against a real local backend (`pnpm shots:live`); nothing is mocked or composited.
+
 | | |
 |---|---|
-| ![Hero and the one-line claim](docs/screenshots/01-hero.png) | The page opens with the problem and the contrast the demo proves: *same agent, same valid identity, different amount, different decision.* |
-| ![Who is acting and what is granted](docs/screenshots/02-identity-and-authority.png) | Principals (issuer, agent, service) and the signed delegation: action, resources, audience and the **≤ 500 SAR** limit — read from the backend profile. |
-| ![120 SAR authorized](docs/screenshots/03-allow-120.png) ![5000 SAR denied](docs/screenshots/04-deny-5000.png) | The verdict, reason code and amount-vs-limit come from the backend `GatewayResult`; the browser never decides anything. |
-| ![Verification, policy and provenance in the real gateway order](docs/screenshots/05-pipeline.png) | Eight steps in the real execution order: identity → replay claim → credentials & status → delegation chain verified → **policy** → decision receipt → execution (simulated) → outcome receipt. |
-| ![Spoofed agent denied](docs/screenshots/06-spoof-denied.png) ![Grant, scope, revoke](docs/screenshots/07-grant-scope-revoke.png) | A concrete spoof failure case and the grant → scope → verify → revoke → quarantine lifecycle, each step tied to something runnable or a suite scenario. |
-| ![Evidence and audit](docs/screenshots/08-evidence-and-audit.png) ![Mobile](docs/screenshots/09-mobile-deny-5000.png) | Attestations, a signed audit chain (own signer, **not** externally anchored) and a responsive mobile layout. |
+| ![Decision stage, light](docs/screenshots/01-hero-light.png) ![Decision stage, dark](docs/screenshots/09-hero-dark.png) | **Trust is a grant, not a score.** AcmeOrg grants SupportAgent authority to refund up to **500 SAR** (read from the backend's signed profile). Two request buttons; the verdict area stays empty ("No decision yet") until a request has really run. Light by default, dark on request. |
+| ![120 SAR authorized](docs/screenshots/02-allow-120-light.png) ![5,000 SAR denied](docs/screenshots/03-deny-5000-light.png) | Verdict, reason code and amount-vs-limit come from the backend `GatewayResult`. **Authorization** (the policy decision) and **Execution (simulated)** are shown as two separate rows; the browser decides nothing. |
+| ![Side-by-side comparison, light](docs/screenshots/04-comparison-light.png) ![Side-by-side comparison, dark](docs/screenshots/10-comparison-dark.png) | After both requests have returned, a comparison built only from those two responses — *same agent, same credential, different amount, different decision* (it says "same outcome" instead if the backend ever returns the same outcome twice). |
+| ![How it was decided](docs/screenshots/05-pipeline-light.png) | "How it was decided": eight steps in the real gateway order — identity → replay claim → credentials & status → delegation chain verified → **policy** → decision receipt → execution (simulated) → outcome receipt — behind a disclosure, with technical receipts one level deeper. |
+| ![Failure cases](docs/screenshots/06-failure-cases-light.png) ![Grant, scope, revoke](docs/screenshots/07-grant-scope-revoke-light.png) | Spoofed agent, revoked credential and replay first; three more (quarantine, wrong audience, tampered request) behind a disclosure. A compact Grant · Scope · Revoke explanation, each step tied to something runnable or a suite scenario. |
+| ![Evidence](docs/screenshots/08-evidence-light.png) ![Security tests](docs/screenshots/17-security-tests.png) | The 60-scenario suite summary, a signed hash-chained audit history (own signer, **not** externally anchored), attestations ("evidence, never authority") and runtime facts, each behind a disclosure. |
+| ![Mobile hero](docs/screenshots/11-mobile-hero-light.png) ![Mobile verdict](docs/screenshots/12-mobile-allow-light.png) ![Mobile comparison](docs/screenshots/14-mobile-comparison-light.png) ![Mobile dark](docs/screenshots/15-mobile-deny-dark.png) ![Tablet](docs/screenshots/16-tablet-comparison-light.png) | Responsive on phone and tablet; after a request the page scrolls the verdict into view without moving keyboard focus. |
 
 **Architecture in one line:** Identity → Claims → Verification → Authority → Policy → Provenance (full diagram in [docs/architecture.md](docs/architecture.md)).
 
@@ -209,7 +212,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 504 tests in the default `pnpm test` run (435 package tests + the 69 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 494 pass and 10 native-parity cases skip), a 45-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 513 tests in the default `pnpm test` run (435 package tests + the 78 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 503 pass and 10 native-parity cases skip), a 78-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { TopBar } from '@/components/sections';
 import type { AttackReportDto, AttackScenarioDto } from '@/lib/dto';
 
 /**
@@ -44,15 +45,7 @@ export default function AttacksPage() {
 
   return (
     <div className="page">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden>✓</span>
-          <span>Agent Trust · Security tests</span>
-        </div>
-        <nav className="nav" aria-label="Page">
-          <a href="/">← Back to the demo</a>
-        </nav>
-      </header>
+      <TopBar backHome />
 
       <main id="main">
         <section className="hero" style={{ paddingBottom: 0 }}>

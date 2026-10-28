@@ -252,6 +252,71 @@ export function explainReason(code: string | undefined, details: { requested?: n
   }
 }
 
+// ------------------------------------- authorization vs execution (two facts)
+
+export interface FactView {
+  tone: Tone;
+  label: string;
+  detail: string;
+}
+
+/**
+ * Authorization (the policy decision) and execution (what the simulated
+ * executor then did) are different facts and are reported separately. Both
+ * are read from the GatewayResult; nothing here decides anything.
+ */
+export function decisionSplit(decision: DecisionDto): { authorization: FactView; execution: FactView } {
+  const policy = decision.stages.policy;
+  const authorization: FactView =
+    decision.effect === 'ALLOW'
+      ? { tone: 'ok', label: 'Allowed by policy', detail: 'The deterministic policy found the request inside the verified authority.' }
+      : decision.effect === 'DENY' && policy === 'DENY'
+        ? { tone: 'deny', label: 'Denied by policy', detail: 'Every verification step passed; the policy refused this specific request.' }
+        : decision.effect === 'DENY'
+          ? { tone: 'deny', label: 'Denied before policy', detail: 'A verification step failed, so policy never ran.' }
+          : { tone: 'warn', label: 'No authorization decision', detail: 'The request did not reach a policy decision.' };
+
+  const raw = decision.stages.execution;
+  const recorded = decision.executionReceiptId !== undefined;
+  let execution: FactView;
+  if (decision.outcome === 'EXECUTION_UNCERTAIN') {
+    execution = { tone: 'warn', label: 'Uncertain (simulated)', detail: 'The simulated action ran but its outcome receipt could not be saved.' };
+  } else if (raw === 'SUCCEEDED') {
+    execution = {
+      tone: 'ok',
+      label: 'Succeeded (simulated)',
+      detail: recorded ? 'The simulated refund ran; its outcome receipt is recorded. No money moves.' : 'The simulated refund ran. No money moves.',
+    };
+  } else if (raw === 'FAILED') {
+    execution = { tone: 'deny', label: 'Failed (simulated)', detail: 'The simulated executor reported a failure.' };
+  } else if (raw === 'NOT_RUN') {
+    execution = { tone: 'neutral', label: 'Not run', detail: decision.effect === 'DENY' ? 'Nothing was executed.' : 'The executor did not run.' };
+  } else {
+    execution = { tone: 'neutral', label: raw, detail: 'Reported by the gateway.' };
+  }
+  return { authorization, execution };
+}
+
+/** "n of 4 verification steps passed" — read from the stages, never inferred. */
+export function verificationSummary(decision: DecisionDto): { passed: number; total: number } {
+  const steps = pipelineView(decision).find((g) => g.id === 'verification')?.steps ?? [];
+  return { passed: steps.filter((s) => s.tone === 'ok').length, total: steps.length };
+}
+
+/**
+ * How two real responses relate: derived only from the two verdicts the
+ * backend produced. 'pending' until both exist.
+ */
+export function comparisonOf(a: Verdict | undefined, b: Verdict | undefined): 'pending' | 'different' | 'same' {
+  if (a === undefined || b === undefined) return 'pending';
+  return a.kind === b.kind ? 'same' : 'different';
+}
+
+/** The three failure demonstrations shown first; the rest sit behind a disclosure. */
+export const PRIMARY_FAILURE_IDS = ['spoof', 'revoked', 'replay'] as const;
+/** Grant / scope / revoke: the compact lifecycle story (verify and quarantine live in the suite and failure cases). */
+export const COMPACT_LIFECYCLE_KEYS = ['grant', 'scope', 'revoke'] as const;
+
 export function shortHash(value: string | undefined): string {
   if (value === undefined) return '—';
   const hex = value.replace(/^sha256:/, '');
