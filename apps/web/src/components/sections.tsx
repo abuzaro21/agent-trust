@@ -491,6 +491,7 @@ export function FailureExamples({ runs, running, onRun, limit }: { runs: Runs; r
                   <summary>Show the pipeline</summary>
                   <PipelineStepper decision={rec.evaluation.result} />
                 </details>
+                <EvidenceDetails record={rec} />
               </div>
             )}
           </article>
@@ -584,7 +585,7 @@ export function EvidenceSection({ profile, audit, status }: { profile: ProfileDt
 
       <section className="card" aria-labelledby="audit-title">
         <h3 className="card-title" id="audit-title">Signed audit history</h3>
-        <p className="card-sub">Every decision is appended to a hash chain. Editing or deleting an old entry breaks the chain after it.</p>
+        <p className="card-sub">Decisions that reach policy, and the outcomes of executions, are appended to a hash chain; editing or deleting an old entry breaks the chain after it. Requests rejected earlier (a spoofed identity, a replay, a credential problem) are denied but leave no receipt, so nobody can write entries under someone else&apos;s name.</p>
         {audit === null ? (
           <div className="skeleton" style={{ marginTop: 'var(--s4)' }} aria-busy="true" />
         ) : audit.error !== undefined ? (
@@ -655,8 +656,8 @@ export function ReportSummary({ report, error }: { report: AttackReportDto | nul
             ))}
           </div>
           <p className="note" style={{ marginTop: 'var(--s3)' }}>
-            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario checks the denial reason and that
-            the protected action never ran. <a href="/attacks">Open the full report →</a> · <a href={`${REPO}/tree/main/packages/attacks`}>suite source</a>
+            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario checks the expected reason and its own
+            side-effect invariants (for example, that the executor did not run on a denial). <a href="/attacks">Open the full report →</a> · <a href={`${REPO}/tree/main/packages/attacks`}>suite source</a>
           </p>
         </>
       )}

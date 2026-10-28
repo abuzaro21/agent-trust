@@ -108,6 +108,10 @@ export function pipelineView(decision: DecisionDto): PipelineGroupView[] {
           : 'NOT_RUN';
     } else {
       raw = decision.stages[def.source];
+      // When execution succeeded but its OUTCOME receipt could not be saved the gateway reports
+      // stages.audit = FAIL while the decision receipt does exist (decisionReceiptId): the
+      // decision receipt is fine; the outcome step carries the failure.
+      if (def.key === 'decisionReceipt' && raw === 'FAIL' && decision.decisionReceiptId !== undefined) raw = 'RECORDED';
     }
     const value =
       raw === 'NOT_RUN'
@@ -220,7 +224,7 @@ export function explainReason(code: string | undefined, details: { requested?: n
     case 'CREDENTIAL_STATUS_UNAVAILABLE':
       return 'The credential’s status could not be checked, so the fabric denies rather than guessing.';
     case 'AGENT_QUARANTINED':
-      return 'This agent identity is quarantined (emergency kill switch), even though its proof and credential are valid.';
+      return 'This agent identity is quarantined (emergency kill switch), which stops it even though its own signed proof is valid.';
     case 'REPLAY_DETECTED':
       return 'These exact signed bytes were already used once. Replay protection is claim-once: one authorization, one execution.';
     case 'UNTRUSTED_ISSUER':
@@ -234,7 +238,7 @@ export function explainReason(code: string | undefined, details: { requested?: n
     case 'VC_SIGNATURE_INVALID':
       return 'The credential’s signature did not verify.';
     case 'REQUEST_MALFORMED':
-      return 'The request failed input validation before any verification ran (for example an amount that is not a positive number). Nothing was recorded or executed.';
+      return 'The request failed input validation (for example an amount that is not a positive number, or a missing credential), so no authorization decision was made. Nothing was executed.';
     case 'POLICY_EVALUATION_ERROR':
       return 'The policy engine failed. The fabric denies rather than guessing; no receipt is written because the policy identity is unknown.';
     case 'AUDIT_LOG_UNAVAILABLE':
@@ -271,7 +275,7 @@ export const FAILURE_SCENARIOS: ScenarioMeta[] = [
   { id: 'spoof', title: 'Spoofed agent', tone: 'deny', suite: 'IDENTITY-001', proves: 'An impostor claims the SupportAgent’s DID but signs with its own key. Identity fails first; policy and execution never run.', note: 'No receipt is attributed to the victim.' },
   { id: 'revoked', title: 'Revoked credential', tone: 'deny', suite: 'STATUS-001', proves: 'Revoking a credential (one bit on a status list) blocks the next request that carries it, even from the legitimate agent.', note: 'Uses a separate isolated credential so the main one stays valid for other visitors.' },
   { id: 'replay', title: 'Replayed request', tone: 'deny', suite: 'REPLAY-001', proves: 'The identical signed request is accepted once and rejected the second time: one authorization, one execution.', note: 'The server sends the same request twice; this demonstrates the protection, it is not a live external attacker.' },
-  { id: 'quarantine', title: 'Quarantined agent', tone: 'warn', suite: 'STATUS-003', proves: 'An emergency kill switch stops an identity even when its proof and credential are valid.' },
+  { id: 'quarantine', title: 'Quarantined agent', tone: 'warn', suite: 'STATUS-003', proves: 'An emergency kill switch stops an identity even when its own signed proof is valid.' },
   { id: 'wrong-audience', title: 'Wrong audience', tone: 'warn', suite: 'IDENTITY-004', proves: 'A delegation only works for the service it names; the same request aimed at another service is denied.' },
   { id: 'tampered', title: 'Tampered request', tone: 'warn', suite: 'IDENTITY-003', proves: '120 SAR is signed but 5000 SAR is sent. The signature no longer matches the content, so identity fails before policy sees the amount.' },
 ];

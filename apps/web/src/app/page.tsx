@@ -52,17 +52,25 @@ export default function Page() {
   const [amountError, setAmountError] = useState<string | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   // One request at a time. Buttons use aria-disabled (not `disabled`) so keyboard focus is never lost.
-  const busyRef = useRef(false);
-  const begin = useCallback((id: string): boolean => {
-    if (busyRef.current) return false;
-    busyRef.current = true;
+  // Each run owns a token; only the owner can release the lock, so a late `finally`
+  // from an earlier run can never free a newer run's lock.
+  const activeRef = useRef<number | null>(null);
+  const seqRef = useRef(0);
+  const begin = useCallback((id: string): number | null => {
+    if (activeRef.current !== null) return null;
+    const token = ++seqRef.current;
+    activeRef.current = token;
     setRunning(id);
-    return true;
+    return token;
   }, []);
-  const release = useCallback(() => {
-    busyRef.current = false;
+  const release = useCallback((token: number) => {
+    if (activeRef.current !== token) return;
+    activeRef.current = null;
     setRunning(null);
   }, []);
+  const lastReq = useRef<{ id: string; amount?: number } | null>(null);
+  const evSeq = useRef(0);
+  const [evidenceStale, setEvidenceStale] = useState(false);
 
   const refresh = useCallback(async (attempt = 0): Promise<void> => {
     try {
@@ -116,12 +124,18 @@ export default function Page() {
   }, []);
 
   const reloadEvidence = useCallback(async () => {
+    const mine = ++evSeq.current; // only the newest refresh may update the panels
     try {
-      const [p, a] = await Promise.all([fetch('/api/agents/support/profile').then((r) => r.json()), fetch('/api/audit/acme-demo').then((r) => r.json())]);
+      const [pr, ar] = await Promise.all([fetch('/api/agents/support/profile'), fetch('/api/audit/acme-demo')]);
+      if (!pr.ok || !ar.ok) throw new Error('evidence refresh failed');
+      const [p, a] = await Promise.all([pr.json(), ar.json()]);
+      if (mine !== evSeq.current) return;
       setProfile(p);
       setAudit(a);
+      setEvidenceStale(false);
     } catch {
-      /* evidence panels keep their previous (still-true) content */
+      // The panels keep their previous content, which no longer includes the latest run: say so.
+      if (mine === evSeq.current) setEvidenceStale(true);
     }
   }, []);
 
@@ -133,37 +147,41 @@ export default function Page() {
 
   const runPrimary = useCallback(
     async (id: string, customAmount?: number) => {
-      if (!begin(id)) return;
+      const token = begin(id);
+      if (token === null) return;
+      lastReq.current = { id, amount: customAmount };
       setErrorPrimary(null);
       try {
         const rec = await evaluate(id, customAmount);
         if (rec !== undefined) setLast(rec);
-        release(); // the verdict is on screen; refresh the evidence panels in the background
+        release(token); // the verdict is on screen; refresh the evidence panels in the background
         scrollToVerdict();
         await reloadEvidence();
       } catch (e) {
         setErrorPrimary(e instanceof Error ? e.message : String(e));
       } finally {
-        release();
+        release(token);
       }
     },
     [begin, release, evaluate, reloadEvidence, scrollToVerdict],
   );
 
   const runBoth = useCallback(async () => {
-    if (!begin('both')) return;
+    const token = begin('both');
+    if (token === null) return;
+    lastReq.current = { id: 'both' };
     setErrorPrimary(null);
     try {
       await evaluate('valid-120');
       const second = await evaluate('over-5000');
       if (second !== undefined) setLast(second);
-      release();
+      release(token);
       scrollToVerdict();
       await reloadEvidence();
     } catch (e) {
       setErrorPrimary(e instanceof Error ? e.message : String(e));
     } finally {
-      release();
+      release(token);
     }
   }, [begin, release, evaluate, reloadEvidence, scrollToVerdict]);
 
@@ -179,22 +197,31 @@ export default function Page() {
 
   const runOther = useCallback(
     async (id: string) => {
-      if (!begin(id)) return;
+      const token = begin(id);
+      if (token === null) return;
       setErrorOther(null);
       try {
         // Presets that belong to the main demo also update the main verdict.
         const rec = await evaluate(id);
         if (rec !== undefined && PRIMARY.has(id)) setLast(rec);
-        release();
+        release(token);
         await reloadEvidence();
       } catch (e) {
         setErrorOther(e instanceof Error ? e.message : String(e));
       } finally {
-        release();
+        release(token);
       }
     },
     [begin, release, evaluate, reloadEvidence],
   );
+
+  const retryLast = useCallback(() => {
+    const req = lastReq.current;
+    setErrorPrimary(null);
+    if (req === null) return;
+    if (req.id === 'both') void runBoth();
+    else void runPrimary(req.id, req.amount);
+  }, [runBoth, runPrimary]);
 
   const limit = limitFromProfile(profile);
 
@@ -231,7 +258,7 @@ export default function Page() {
               onRun={(id) => void runPrimary(id)}
               onCustom={runCustom}
               onBoth={() => void runBoth()}
-              onRetry={() => setErrorPrimary(null)}
+              onRetry={retryLast}
             />
           </div>
         </div>
@@ -241,8 +268,8 @@ export default function Page() {
             <div className="eyebrow">2 · Failure thinking</div>
             <h2 id="failures-h">What happens when something is wrong?</h2>
             <p>
-              Each case below is a real request through the same gateway. All of them must be denied, and the protected action must never run. The full 60-scenario suite checks
-              those side effects too.
+              Each case below is a real request through the same gateway and must be denied. (In the replay case the first send is legitimate — one authorization, one execution —
+              and only the identical re-send must be refused.) The 60-scenario suite checks each scenario&apos;s side-effect invariants too, for example that the executor did not run on a denial.
             </p>
           </div>
           {errorOther !== null && (
@@ -267,6 +294,12 @@ export default function Page() {
             <div className="eyebrow">4 · Trust profile evidence</div>
             <h2 id="ev-h">Credentials, attestations and an audit trail you can check</h2>
           </div>
+          {evidenceStale && (
+            <div className="callout" role="status" style={{ marginBottom: 'var(--s4)' }}>
+              <strong>The evidence panels could not be refreshed after the last request,</strong> so they may not include it.{' '}
+              <button type="button" className="btn btn--small" onClick={() => void reloadEvidence()}>Reload evidence</button>
+            </div>
+          )}
           <EvidenceSection profile={profile} audit={audit} status={status} />
           <div style={{ marginTop: 'var(--s4)' }}>
             <ReportSummary report={report} error={reportError} />

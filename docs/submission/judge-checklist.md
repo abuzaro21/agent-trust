@@ -3,26 +3,28 @@
 Every challenge requirement mapped to a concrete, inspectable artifact.
 Nothing vague; every row is clickable or runnable.
 
+**Challenge requirements as verified by the project owner** (taken from the challenge page; not independently re-fetched): trust profiles with history, scoped authority and attestations · signed verifiable credentials · grant / revoke / scope trust · a trust-gated agent interaction · a concrete malicious or spoofed-agent failure case · identity → claims → verification → policy · a two-year thesis ≤ 300 words. Submission: public repository with a clean-clone working build; **a live demo URL is required**; a 90-second video is **optional but recommended**; AI tools, decisions and out-of-scope notes. Disqualifiers: a reputation score without mechanisms; no demo of a trust-gated decision.
+
 ## Challenge requirements
 
 | Requirement | Artifact | Where |
 |---|---|---|
-| **Trust profile** (contextual evidence, no score) | `TrustProfileService` + dashboard Trust Profile panel (live did:web DID, authority, attestations, history) | `packages/trust-profile/src/service.ts` · dashboard `/` left column |
+| **Trust profile** (contextual evidence, no score) | `TrustProfileService` + dashboard "Who is acting", "What it is allowed to do" and Evidence sections (DID, signed authority, attestations, history) | `packages/trust-profile/src/service.ts` · dashboard `/#identity`, `/#evidence` |
 | **Action history** | Hash-chained Action Receipts + signed checkpoints; profile aggregates from the VERIFIED chain only | `packages/audit/src/` · dashboard audit panel · `GET /api/audit/acme-demo` |
 | **Authority scope** (grant limited, attenuated) | `AgentDelegationCredential` with actions/resources/audience/amount/window/depth (`perDay` is schema-valid but not enforced); `Authority(child) ⊆ Authority(parent)` walker (tested directly; the gateway accepts a single delegation link) | `packages/delegation/src/` · profile "Authority" box |
 | **Vouches / attestations** | `AgentAttestationCredential` through the full VC pipeline; issuer+type-scoped trust; evidence-only (a rejected self-vouch is visible on the dashboard) | `packages/trust-profile` · `packages/vc` |
 | **Verifiable credentials** | W3C VC 2.0-style compact JWS, ES256/P-256, 11-stage verification incl. status binding | `packages/vc/src/` |
-| **Grant / scope issuance** | Org issuer signs delegations; trusted-issuer registry gates whose claims count | `packages/vc` `CredentialIssuer` + `InMemoryIssuerTrustStore` |
-| **Revoke** | W3C Bitstring Status List (permanent revocation, reversible suspension) + emergency quarantine — current status kills authority | `packages/status/src/` · "Revoked Credential" preset |
-| **Accept / refuse a task** | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` |
-| **Live demo (HTTPS URL)** | **https://agent-trust.onrender.com exists but runs the pre-audit build 4c25b4b — redeploy + re-verify before submitting** (see below) (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
+| **Grant / scope issuance** | Org issuer signs delegations; trusted-issuer registry gates whose claims count. The public page explains and exercises grant → scope → verify → revoke → quarantine but exposes **no** issue/revoke controls (shared state must stay valid for other visitors) | `packages/vc` `CredentialIssuer` + `InMemoryIssuerTrustStore` · dashboard `/#lifecycle` |
+| **Revoke** | W3C Bitstring Status List (permanent revocation, reversible suspension) + emergency quarantine — current status kills authority | `packages/status/src/` · dashboard `/#failures` ("Revoked credential") and `/#lifecycle` (the "Revoke" step runs on an isolated credential) |
+| **Accept / refuse a task** (trust-gated interaction; spoof failure case) | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions. Real order: identity → replay claim → credentials & status → delegation chain → policy → decision receipt → execution (simulated) → outcome receipt | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` · dashboard `/#demo`, `/#failures` |
+| **Live demo (HTTPS URL) — REQUIRED** | **https://agent-trust.onrender.com is suspended for security containment (it ran the pre-audit build 4c25b4b); the fix is merged to `main` (`e4ba7eb`, CI green) — redeploy + re-verify before submitting** (see below) (one-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000) | README Quickstart |
 | **Public repository** | github.com/abuzaro21/agent-trust (MIT, CI on every push) | GitHub |
-| **90-second walkthrough** | Narration is 167 tokens ≈ 67 s of speech (`loom-script.md`); recording pending (needs the public URL — not recorded against localhost pretending to be public); the brief's take/edit rules are UNVERIFIED | `docs/submission/loom-script.md` |
+| **90-second walkthrough — OPTIONAL, recommended** | Narration is 167 tokens ≈ 67 s of speech (`loom-script.md`); not recorded yet (needs the public URL — not recorded against localhost pretending to be public); any take/edit rules for the video are UNVERIFIED | `docs/submission/loom-script.md` |
 | **Architecture snapshot** | One-screen diagram, this package | `docs/submission/architecture.md` |
 | **Failure thinking / negative tests** | 60/60 adversarial suite (52 attacks + 8 failure demos) judged on reason code AND side-effect invariants; served at `/attacks`; CI gate `pnpm test:attacks` | `packages/attacks/` |
 | **Two-year thesis** | 293 words (296 with the title; ≤300 limit — the limit itself is from the project's own notes, UNVERIFIED against the live brief) | `docs/submission/two-year-thesis.md` |
 | **AI tools notes** | Honest disclosure incl. seven caught AI mistakes | `docs/submission/ai-tools-and-decisions.md` |
-| **Standards story** | did:web live identities on public HTTPS: `did:web:abuzaro21.github.io:agents:{org,support,refund}` (public documents + repo `abuzaro21/abuzaro21.github.io`) · VC 2.0-style JWS · JOSE ES256 · RFC 8785 · Bitstring Status List · Rego/OPA Wasm | docs/credential-model.md · docs/architecture.md |
+| **Standards story** (bonus signal) | did:web identities (public: `did:web:abuzaro21.github.io:agents:{org,support,refund}`) · VC 2.0-style compact JWS · JOSE ES256 · RFC 8785 · Bitstring Status List · Rego/OPA Wasm. These are **profiles implemented from the specs; no independent conformance certification is claimed** | docs/credential-model.md · docs/architecture.md |
 
 ## Rubric dimensions → demonstrating artifacts
 
@@ -31,8 +33,8 @@ Nothing vague; every row is clickable or runnable.
 | Dimension | Best evidence |
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
-| **Technical depth (25)** | 483 tests in the default run (435 package + 48 apps/web; OPA on PATH needed for all 483) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
-| **Demo quality (20)** | Live dashboard: presets, pipeline view, receipts, profile, DID badges; 5 screenshots at 1440×900; Loom script (once recorded on public URL) |
+| **Technical depth (25)** | 504 tests in the default run (435 package + 66 apps/web; OPA on PATH needed for all 501) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
+| **Demo quality (20)** | Judge-first dashboard: hero, principals + signed grant, the 120-vs-5,000 SAR decision with a large verdict, a real-order pipeline, failure cards, lifecycle, evidence; 10 screenshots regenerated from the current UI (desktop + mobile); responsive at 1920/1440/768/390 px with 43 automated browser checks; optional video script (once recorded on the public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
 
@@ -40,20 +42,22 @@ Nothing vague; every row is clickable or runnable.
 
 | Item | Status |
 |---|---|
-| Typecheck, 483 tests (incl. the 48 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build | PASS on the release branch (see `final-submission.md`) |
+| Typecheck, 504 tests (incl. the 69 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build, 43/43 browser checks | PASS on the release branch (see `final-submission.md`) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
 | `smoke:live` 45/45 | PASS against the current public service (pre-audit build 4c25b4b); NOT RUN on a deployment of the release commit |
 | Public HTTPS URL on the release commit, 90-second walkthrough | BLOCKER — URL exists on the old build; walkthrough not recorded |
-| Live challenge brief (fields, take rules, thesis limit) | UNVERIFIED — brief not accessible |
+| Challenge requirements and judging weights | Provided by the project owner (verified by them on the challenge page); not independently re-fetched by the agents |
+| Video take/edit rules, exact form fields | UNVERIFIED |
+| Screenshots | Regenerated from the current UI with real clicks (`pnpm shots:live`); they must be regenerated again if the UI changes |
 
 ## Submission status
 
 ```text
 SUBMISSION BLOCKER (only one):
-REDEPLOY THE RELEASE COMMIT — https://agent-trust.onrender.com currently runs the pre-audit build 4c25b4b
+REDEPLOY THE MERGED CODE — https://agent-trust.onrender.com is suspended (it ran the pre-audit build 4c25b4b); main = e4ba7eb
 
 Procedure (Render free plan, existing service `agent-trust`; see docs/deployment.md):
-  1. Merge the release branch (with approval), disable the service's auto-deploy first.
+  1. (done) Fix merged to main as e4ba7eb; the service's auto-deploy is OFF and the service is suspended.
   2. Tag the release commit; deploy that exact SHA (render deploys create <service> --commit <SHA> --wait).
   3. Verify: /api/health build.sha == release SHA; /api/demo/status identityMode=web, replayStore=redis;
      DEMO_PUBLIC_URL=https://agent-trust.onrender.com corepack pnpm smoke:live → require 45/45.

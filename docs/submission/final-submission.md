@@ -2,20 +2,17 @@
 
 ## Status
 
-**Public demo status (2026-10-28):** https://agent-trust.onrender.com exists (Render free plan, real did:web identities,
-Redis replay) and passed `smoke:live` 45/45, **but it runs the pre-audit build `4c25b4b`**. Remaining blockers: redeploy
-the release commit and re-verify it (`smoke:live`, presets, audit chain), then record the walkthrough against it.
+**Status (2026-10-28).** The security fixes are merged: `main` is `e4ba7eb` (PR #1, merge commit, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
 
-**Release baseline.** The original submission freeze (`c286ebd`) predates an
-independent audit. Post-audit repairs live on branch
-`fix/agent-trust-doo-p0-20261028` (code baseline `043257b`; documentation
-commits follow it). The final submitted SHA is whatever commit is tagged
-`builders-league-submission-v1` — record it with `git rev-parse --short HEAD`
-and pass it as `DEMO_BUILD_SHA`.
+**Release baseline.** The original submission freeze (`c286ebd`) predates an independent audit. The post-audit repairs
+were merged by PR #1 into `main` as merge commit `e4ba7eb` (tree-identical to the tested branch head `92ff923`; CI green on
+`e4ba7eb`). The judge-facing UI redesign lives on branch `feat/agent-trust-judge-ui-20261028` and is **not merged** until
+approved. The final submitted SHA is whatever commit is tagged `builders-league-submission-v1`; the running build reports it
+at `/api/health` (`RENDER_GIT_COMMIT`).
 
-The remaining act is to redeploy the existing Render service from the release commit and re-verify it
-(procedure in [docs/deployment.md](../deployment.md)). The 45/45 smoke seen on 2026-10-28 was against the
-pre-audit build, so it is **not** evidence for the release commit: re-run it after the redeploy.
+**Submission requirements** (verified by the project owner from the challenge page; not independently re-fetched): public
+repository with a clean-clone working build; **a live demo URL is required**; a 90-second video is **optional but
+recommended**; AI-tools, decisions and out-of-scope notes; a two-year thesis of at most 300 words.
 
 ## Form data (copy/paste)
 
@@ -29,8 +26,8 @@ One-line description: A verifiable trust layer for AI agents combining
 
 Repo URL:            https://github.com/abuzaro21/agent-trust
 
-Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit build 4c25b4b —
-                     do NOT submit until it is redeployed from the release commit).
+Live Demo URL:       https://agent-trust.onrender.com (REQUIRED — currently suspended for security
+                     containment; do NOT submit until it is redeployed from the merged code and verified).
                      Runs from one command:
                        git clone https://github.com/abuzaro21/agent-trust
                        cd agent-trust
@@ -40,7 +37,7 @@ Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit b
                       adds real did:web identities, see docs/deployment.md.
                       The public did:web identities below resolve RIGHT NOW)
 
-Walkthrough URL:     PENDING RECORDING (script ready: loom-script.md)
+Walkthrough URL:     OPTIONAL but recommended — not recorded yet (script ready: loom-script.md)
 
 Architecture summary: Identity → Claims → Verification → Authority →
                       Policy → Provenance. Every request from an agent
@@ -114,8 +111,9 @@ are from those runs; historical counts from the original freeze are not reused.
 
 ```text
 TypeScript typecheck       0 errors
-default `pnpm test`        483 passed (435 package + 48 apps/web; 473 pass + 10 skip without OPA)
-frontend/API subset        48 passed (`pnpm test:frontend`, already inside the 483)
+default `pnpm test`        504 passed (435 package + 69 apps/web; 494 pass + 10 skip without OPA)
+frontend/API subset        69 passed (`pnpm test:frontend`, already inside the 504)
+browser automation         43/43 checks (`pnpm ui:check`: layout at 4 widths, keyboard, states)
 redis integration          5/5 (Redis 7)
 OPA native tests           13/13
 adversarial suite          60/60 (52 attacks + 8 failure demos)

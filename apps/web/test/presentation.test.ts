@@ -95,11 +95,18 @@ describe('pipelineView renders backend stages verbatim', () => {
     expect(steps.filter((s) => s.key !== 'identity').every((s) => s.tone === 'neutral')).toBe(true);
   });
 
-  it('EXECUTION_UNCERTAIN outcome shows an unrecorded outcome receipt as a warning', () => {
-    const groups = pipelineView(decision({ outcome: 'EXECUTION_UNCERTAIN', effect: 'ALLOW', reasonCodes: ['AUDIT_OUTCOME_UNRECORDED'], stages: { ...ALLOW_STAGES, execution: 'SUCCEEDED' } }));
-    const out = groups.flatMap((g) => g.steps).find((s) => s.key === 'outcomeReceipt')!;
-    expect(out.value).toBe('UNRECORDED');
-    expect(out.tone).toBe('warn');
+  it('EXECUTION_UNCERTAIN (real gateway shape): decision receipt is fine, the OUTCOME receipt is the unrecorded step', () => {
+    // gateway.ts: execution succeeded, outcome append failed => stages.audit='FAIL', decisionReceiptId present, no executionReceiptId.
+    const groups = pipelineView(decision({ outcome: 'EXECUTION_UNCERTAIN', effect: 'ALLOW', reasonCodes: ['AUDIT_OUTCOME_UNRECORDED'], stages: { ...ALLOW_STAGES, audit: 'FAIL', execution: 'SUCCEEDED' }, decisionReceiptId: 'rcpt_dec_t1' }));
+    const steps = groups.flatMap((g) => g.steps);
+    expect(steps.find((s) => s.key === 'decisionReceipt')).toMatchObject({ value: 'RECORDED', tone: 'ok' });
+    expect(steps.find((s) => s.key === 'outcomeReceipt')).toMatchObject({ value: 'UNRECORDED', tone: 'warn' });
+    expect(stoppedAt(groups)).toBeUndefined();
+  });
+
+  it('a decision receipt that really could not be written (no receipt id) is shown as failed', () => {
+    const groups = pipelineView(decision({ outcome: 'DENIED', effect: 'DENY', reasonCodes: ['AUDIT_LOG_UNAVAILABLE'], stages: { ...ALLOW_STAGES, audit: 'FAIL', execution: 'NOT_RUN' }, decisionReceiptId: undefined }));
+    expect(groups.flatMap((g) => g.steps).find((s) => s.key === 'decisionReceipt')).toMatchObject({ value: 'FAIL', tone: 'deny' });
   });
 
   it('every step carries TEXT alongside colour (status is never colour-only)', () => {
@@ -137,6 +144,17 @@ describe('verdict and reason-specific messages', () => {
   it('REQUEST_MALFORMED describes input validation, not a missing credential', () => {
     expect(explainReason('REQUEST_MALFORMED')).toMatch(/validation/i);
     expect(explainReason('REQUEST_MALFORMED')).not.toMatch(/delegation credential is required/i);
+  });
+
+  it('explanations do not invent verification that did not happen', () => {
+    expect(explainReason('AGENT_QUARANTINED')).not.toMatch(/credential are valid/i);
+    expect(explainReason('REQUEST_MALFORMED')).not.toMatch(/before any verification/i);
+  });
+
+  it('no copy claims every failure case prevents execution (replay\'s first send is legitimate)', () => {
+    const replay = FAILURE_SCENARIOS.find((s) => s.id === 'replay')!;
+    expect(replay.note).toMatch(/server sends the same request twice/i);
+    expect(replay.proves).toMatch(/accepted once/i);
   });
 
   it('a spoof is described as "not authenticated" and a valid signature is never called permission', () => {

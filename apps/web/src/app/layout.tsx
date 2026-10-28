@@ -30,8 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <a className="skip-link" href="#demo">
-          Skip to the demo
+        <a className="skip-link" href="#main">
+          Skip to main content
         </a>
         {children}
       </body>

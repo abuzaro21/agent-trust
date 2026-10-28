@@ -6,12 +6,9 @@
 
 ## Live Demo
 
-> **Walkthrough: recording pending** (script timed and ready:
-> [docs/submission/loom-script.md](docs/submission/loom-script.md)).
-> The interactive demo (full gateway + Redis-backed replay; the Quickstart runs it
-> with local **fixture** identities — real `did:web` identities need the live overlay
-> and secrets described in [docs/deployment.md](docs/deployment.md)) runs from one command. 
-> A public Render deployment exists at https://agent-trust.onrender.com, but as of 2026-10-28 it runs the **pre-audit build `4c25b4b`** (it still has the audit-chain-poisoning flaw fixed on the release branch). It passed the 45-check live smoke suite (45/45, observed 2026-10-28) and must be redeployed from the release commit and re-verified before it is submitted. The screenshots below come from an earlier rehearsal.
+> **Live demo URL (required): https://agent-trust.onrender.com** — The security fixes are merged: `main` is `e4ba7eb` (PR #1, merge commit, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
+> The interactive demo also runs from one command (see Quickstart; local **fixture** identities — real `did:web` identities need the live overlay and secrets in [docs/deployment.md](docs/deployment.md)).
+> Screenshots below are regenerated from the current UI (`pnpm shots:live`).
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
@@ -42,7 +39,7 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
   in `packages/delegation` (tested directly) but are not presentable through the gateway in P0.
 
 **60/60 adversarial security scenarios pass** at image build time (see the
-[Security Tests view](docs/screenshots/05-security-tests.png)): identity
+[Security Tests view](docs/screenshots/10-security-tests.png)): identity
 spoofing, tampered proofs, audience confusion, delegation widening, revocation
 bypass, replay, provider outages, DID-transport abuse — each judged not only on
 the denial reason but on side-effect invariants (the executor really did not
@@ -50,8 +47,12 @@ run; the victim really was not attributed).
 
 | | |
 |---|---|
-| ![Trust Profile — live did:web identity, scoped authority](docs/screenshots/01-trust-profile.png) | Trust Profile: what VERIFIED evidence exists for this agent — identity, authority, attestations, history. **No scores anywhere.** |
-| ![120 SAR authorized](docs/screenshots/02-allow-120.png) ![5000 SAR denied](docs/screenshots/03-deny-5000.png) | The pipeline view is rendered from the backend `GatewayResult.stages` — the browser never decides anything. |
+| ![Hero and the one-line claim](docs/screenshots/01-hero.png) | The page opens with the problem and the contrast the demo proves: *same agent, same valid identity, different amount, different decision.* |
+| ![Who is acting and what is granted](docs/screenshots/02-identity-and-authority.png) | Principals (issuer, agent, service) and the signed delegation: action, resources, audience and the **≤ 500 SAR** limit — read from the backend profile. |
+| ![120 SAR authorized](docs/screenshots/03-allow-120.png) ![5000 SAR denied](docs/screenshots/04-deny-5000.png) | The verdict, reason code and amount-vs-limit come from the backend `GatewayResult`; the browser never decides anything. |
+| ![Verification, policy and provenance in the real gateway order](docs/screenshots/05-pipeline.png) | Eight steps in the real execution order: identity → replay claim → credentials & status → delegation chain verified → **policy** → decision receipt → execution (simulated) → outcome receipt. |
+| ![Spoofed agent denied](docs/screenshots/06-spoof-denied.png) ![Grant, scope, revoke](docs/screenshots/07-grant-scope-revoke.png) | A concrete spoof failure case and the grant → scope → verify → revoke → quarantine lifecycle, each step tied to something runnable or a suite scenario. |
+| ![Evidence and audit](docs/screenshots/08-evidence-and-audit.png) ![Mobile](docs/screenshots/09-mobile-deny-5000.png) | Attestations, a signed audit chain (own signer, **not** externally anchored) and a responsive mobile layout. |
 
 **Architecture in one line:** Identity → Claims → Verification → Authority → Policy → Provenance (full diagram in [docs/architecture.md](docs/architecture.md)).
 
@@ -208,7 +209,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 483 tests in the default `pnpm test` run (435 package tests + the 48 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 473 pass and 10 native-parity cases skip), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 504 tests in the default `pnpm test` run (435 package tests + the 69 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 494 pass and 10 native-parity cases skip), a 43-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|
@@ -242,6 +243,9 @@ pnpm test:attacks       # same suite as a CI gate (exits non-zero on any FAIL)
 # Demo dashboard (Next.js)
 pnpm dev                # http://localhost:3000 — trust console + /attacks security tests
 pnpm test:frontend      # API adapter integration + presentation tests
+pnpm ui:check           # browser checks of the running UI (UI_URL=http://localhost:3000 — layout, keyboard, states)
+pnpm ui:shots           # screenshots + horizontal-overflow report at 1920/1440/768/390 px
+pnpm shots:live         # regenerate docs/screenshots from the real UI
 pnpm build:web          # production build check
 pnpm demo:did:init      # one-time live identity setup → did:web docs + gitignored local keys
 pnpm demo:did:resolve did:web:example.com:agents:support   # real HTTPS resolution + diagnostics

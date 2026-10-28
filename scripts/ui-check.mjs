@@ -91,7 +91,7 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
     });
     check('one <h1>, no skipped heading levels', s.h1 === 1 && !s.skip, JSON.stringify(s));
     check('landmarks: header, main, footer, labelled nav; lang=en', s.main === 1 && s.header >= 1 && s.footer === 1 && s.nav >= 1 && s.lang === 'en', JSON.stringify(s));
-    check('skip link is focusable and first', s.firstFocus.includes('skip-link'), JSON.stringify(s.firstFocus));
+    check('skip link is focusable and first (targets #main)', s.firstFocus.includes('skip-link'), JSON.stringify(s.firstFocus));
     check('every button and input has an accessible name', s.unlabeledButtons === 0 && s.unlabeledInputs === 0, JSON.stringify(s));
     check('executor is labelled as simulated on the page', s.simulatedLabel, JSON.stringify(s));
     check('no trust score is rendered', !s.noScoreWords);
@@ -149,6 +149,8 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   check('spoof card: IDENTITY_PROOF_INVALID, "not authenticated", no limit wording', /not authenticated/i.test(spoof) && !/limit|exceed/i.test(spoof.replace(/Spoofed agent[\s\S]*?Run this case/i, '')), spoof.slice(0, 300));
   const mainStill = await page.evaluate(() => document.getElementById('verdict-anchor')?.innerText ?? '');
   check('running a failure card does not overwrite the main verdict', /Authorized/.test(mainStill));
+  const evidence = await page.evaluate(() => document.querySelector('#f-spoof').closest('article').innerText);
+  check('failure cards keep per-request evidence (receipts disclosure)', /Evidence & receipts/.test(evidence));
   check('no console errors during the flow', page._errors.length === 0, page._errors.slice(0, 2).join(' | '));
   await page.close();
 }
@@ -190,11 +192,15 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   await page.close();
 }
 {
+  let posts = 0;
   const page = await open(1440, 900, {
     intercept: (req) => {
       if (req.method() === 'POST' && req.url().endsWith('/api/trust/evaluate')) {
-        req.respond({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'GATEWAY_UNAVAILABLE', detail: 'simulated outage' }) });
-        return true;
+        posts += 1;
+        if (posts === 1) {
+          req.respond({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'GATEWAY_UNAVAILABLE', detail: 'simulated outage' }) });
+          return true;
+        }
       }
       return false;
     },
@@ -204,8 +210,8 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   const e = await page.evaluate(() => document.querySelector('#verdict-anchor [role="alert"]').innerText);
   check('error state: role=alert with the machine reason and a Retry action', /could not be completed/i.test(e) && /GATEWAY_UNAVAILABLE/.test(e) && /Retry/.test(e), e);
   await (await buttonByText(page, '^retry$')).click();
-  const gone = await page.evaluate(() => !document.querySelector('#verdict-anchor [role="alert"]'));
-  check('Retry clears the error', gone);
+  await page.waitForFunction(() => /Authorized/.test(document.getElementById('verdict-anchor')?.innerText ?? ''), { timeout: 30000 });
+  check('Retry really re-sends the request (second POST) and recovers to the real result', posts === 2 && page._evaluateRequests === 2, `posts=${posts}`);
   await page.close();
 }
 {
