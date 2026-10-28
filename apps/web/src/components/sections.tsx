@@ -782,7 +782,7 @@ export function ReportSummary({ report, error }: { report: AttackReportDto | nul
             </div>
           </details>
           <p className="note">
-            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario checks the expected reason, and most also check
+            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario is checked against its expected behavior, and most also check
             side-effect or state invariants (for example, that the executor did not run on a denial). <a href="/attacks">Open the full report →</a> · <a href={`${REPO}/tree/main/packages/attacks`}>suite source</a>
           </p>
         </>

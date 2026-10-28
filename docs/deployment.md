@@ -94,15 +94,15 @@ PR #2 (merge commit `0a3e623`, CI green).
 **Redeploy (2026-10-28, approved controlled operation).** Render refuses to deploy a suspended service (`render deploys create` →
 HTTP 400 `cannot deploy suspended service`), so the service was **resumed and the exact commit deployed in one scripted run** with a
 10-minute fail-safe (suspend on failure or timeout). Render did not create a deploy on resume; the API deploy for `0a3e623` went
-live 111 s after the resume (deploy `dep-dbgvq5egekts738vh0ug`). **Exposure note:** the previous build `4c25b4b` answered publicly for
-roughly 80–90 s (first observed 24 s after the resume) until the new deploy replaced it; no probes were sent to it. The older deploys
-are `deactivated`.
+live 111 s after the resume (deploy `dep-dbgvq5egekts738vh0ug`). **Exposure note:** the previous build `4c25b4b` first answered plain `/api/health` polling 24 s after the resume (no other requests
+were sent to it); Render marked the new deployment live at 111 s, so the interval was approximately 87 s; the exact public cutover time
+was not recorded. The older deploys are `deactivated`.
 
 **Verified on the deployed build:** `/api/health` → `status ok`, `identityMode web`, `build.sha 0a3e623` (matches Render's deployed
 commit); `/api/demo/status` → `replayStore redis`; `pnpm smoke:live` **45/45**; a real-click browser check of the public site
 **15/15** (grant read from the backend, 120 SAR allowed, 5,000 SAR denied, comparison from the two responses, spoof / revoked /
-replay, audit chain and checkpoint valid, 60/60 report); log scan of the build and startup output found no errors and no secret
-material. Service flags afterwards: not suspended, auto-deploy **off**, plan Free. The service still carries a `DEMO_BUILD_SHA`
+replay, audit chain and checkpoint valid, 60/60 report); a scan of 400 build-log and 150 runtime-log lines found zero
+secret-pattern matches and zero real errors in those samples (the app logs nothing per request after startup). Service flags afterwards: not suspended, auto-deploy **off**, plan Free. The service still carries a `DEMO_BUILD_SHA`
 environment variable from the earlier deploy; the app prefers Render's `RENDER_GIT_COMMIT`, so the reported SHA is correct. Re-verify
 before submitting: the free plan sleeps after about 15 minutes idle and demo state resets on restart.
 

@@ -53,8 +53,8 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       (52 attacks + 8 failure demos) across identity,
                       credentials, authority, status, replay, policy,
                       audit, attestation, did:web transport, and
-                      infrastructure — each judged on its expected outcome and
-                      reason and, for 58 of the 60, on side-effect/state invariants
+                      infrastructure — each judged against its expected behavior
+                      (outcome and, where specified, reason code) and, for 58 of the 60, on side-effect/state invariants
                       (the executor really did not run; a spoof is never
                       attributed to the victim); POLICY-002 and STATUS-004
                       do not assert one.
@@ -129,10 +129,10 @@ Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at 71b3ef6; la
 Public service (https://agent-trust.onrender.com):
   Was suspended for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b), then resumed and
   redeployed from 0a3e623 (Render deploy dep-dbgvq5egekts738vh0ug) the same day; the previous build was reachable for
-  roughly 80-90 s during the controlled cutover.
+  approximately 87 s during the cutover (first observed answering health polling at +24 s after the resume; the new deploy was live at +111 s; the exact cutover time was not recorded).
   Verified on the deployed build: /api/health build.sha 0a3e623, identityMode web; /api/demo/status replayStore redis;
   smoke:live 45/45; real-click UI check 15/15 (120 SAR allowed, 5,000 SAR denied, comparison, spoof, revoked, replay,
-  audit chain valid, 60/60 report); log scan found no errors or secret material. Auto-deploy remains off.
+  audit chain valid, 60/60 report); a scan of 400 build-log and 150 runtime-log lines found zero secret-pattern matches and zero real errors in those samples. Auto-deploy remains off.
 ```
 
 Independent review: a read-only audit by a second model family (Codex GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass
