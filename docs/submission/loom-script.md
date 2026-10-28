@@ -92,7 +92,7 @@ Recording rules:
 ## 1:18–1:30 — Evidence / close
 **Show:** the *Security test suite* card under Evidence (60 / 60, "generated when the image was built") → open `/attacks`, hold on the 60/60 summary, then back to the demo. Optional: open "Signed audit history" to show the chain-intact chips and the honest-log note.
 
-> "Sixty security scenarios, each judged on reason code and side effects.
+> "Sixty security scenarios, checked against their expected behavior.
 > Trust isn't a score — it's verifiable, scoped, revocable authority."
 
 ---

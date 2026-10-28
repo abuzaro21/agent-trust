@@ -57,6 +57,7 @@ const WASM_PATH = join(ROOT, 'artifacts', 'policy', 'policy.wasm').replaceAll('\
 const MANIFEST_PATH = join(ROOT, 'artifacts', 'policy', 'manifest.json').replaceAll('\\', '/');
 /** Committed artifact paths, resolved for any execution layout. */
 export const ATTACK_WASM_PATH = WASM_PATH;
+export const ATTACK_MANIFEST_PATH = MANIFEST_PATH;
 
 export interface AttackWorld {
   gateway: TrustGateway;

@@ -5,7 +5,7 @@
 **A trust & authorization fabric for AI agents.** An agent may act only as far as it was *verifiably* authorized: a DID-proven identity, signed W3C credentials, scoped and revocable delegation, replay protection and a deterministic policy decide every request — never reputation, history or the UI. Audit-before-execution: a decision that reaches policy is written to a tamper-evident, hash-chained log *before* anything runs, and nothing executes without that receipt. Requests rejected earlier (a spoofed identity, a replay, a credential problem) or hit by an infrastructure failure are denied without a decision receipt — by design, so nobody can write entries under someone else's name.
 
 > **Live demo (required deliverable):** https://agent-trust.onrender.com
-> **Status (2026-10-28): the public service is suspended** while the merged security fixes are redeployed and re-verified (`smoke:live`, presets, audit chain). Until it is back, run the demo locally with the quickstart below. Current status of the public URL is tracked in [docs/submission/final-submission.md](docs/submission/final-submission.md).
+> **Status (2026-10-28): live and verified.** The public service runs commit `0a3e623` (the merge of PR #2), deployed on 2026-10-28 and verified the same day: `/api/health` reports `build.sha 0a3e623`, `identityMode web`; `/api/demo/status` reports `replayStore redis`; `pnpm smoke:live` passed 45/45 and a real-click browser check of the public site passed 15/15. The free plan sleeps after about 15 minutes idle, so the first request can take about a minute. Details: [docs/deployment.md](docs/deployment.md). You can also run the demo locally with the quickstart below.
 > **The refund executor is a simulation — no money moves.**
 
 ### Quickstart (local, ~3 minutes on first build)
@@ -33,7 +33,7 @@ Prerequisites: Docker with Compose v2, internet access to pull base images, and 
   </tr>
 </table>
 
-> **Where these images come from:** they were captured by clicking the real buttons against a **local** backend in fixture mode (`pnpm shots:live`) — nothing is mocked or composited. They are **not** evidence of the public deployment; there is no public-deployment capture until the service has been redeployed and verified.
+> **Where these images come from:** they were captured by clicking the real buttons against a **local** backend in fixture mode (`pnpm shots:live`) — nothing is mocked or composited. They are **not** captures of the public deployment (the public site was verified separately on 2026-10-28 — see above; those screenshots are not included here).
 
 <details>
 <summary>More screenshots (desktop, tablet, mobile; light and dark)</summary>
@@ -63,12 +63,10 @@ Prerequisites: Docker with Compose v2, internet access to pull base images, and 
 The second row is the thesis: the agent was not "less trusted" — the *action*
 left the scope of its authority. Deterministic policy, not reputation, decides.
 
-**60/60 adversarial security scenarios pass** at image build time (see the
+**60/60 security scenarios pass** at image build time (see the
 [Security Tests view](docs/screenshots/17-security-tests.png)): identity
 spoofing, tampered proofs, audience confusion, delegation widening, revocation
-bypass, replay, provider outages, DID-transport abuse — each judged not only on
-the denial reason but on side-effect invariants (the executor really did not
-run; the victim really was not attributed).
+bypass, replay, provider outages, DID-transport abuse — each judged on a typed expected outcome class and machine-checked invariants (for example that the executor and policy never ran on a denial, that a corrupted policy bundle never yields an engine, that untouched audit history verifies before it is tampered with); 49 of the 60 also require a specific reason code, and the other 11 record why they have none. A scenario fails if its verdict, reason code, any invariant, or its checker is missing. How this is enforced, what it does not prove, and the mutation evidence: [docs/security-assurance.md](docs/security-assurance.md).
 
 ### What this demo is — and is not
 
@@ -230,7 +228,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 520 tests in the default `pnpm test` run (435 package tests + the 85 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 510 pass and 10 native-parity cases skip), a 78-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 520 tests in the default `pnpm test` run (435 package tests + the 85 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 510 pass and 10 native-parity cases skip), a 78-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. The public Render service was redeployed from `0a3e623` and verified on 2026-10-28 (`smoke:live` 45/45; see [docs/deployment.md](docs/deployment.md)). Outstanding: the optional recorded walkthrough, and a final re-verification of the public URL immediately before submission.
 
 | Phase | Scope |
 |---|---|
@@ -258,7 +256,7 @@ TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
 
 pnpm demo:e2e           # cross-agent gateway demonstration (all real components)
 pnpm demo:profile       # evidence-based Trust Profiles — attestations, history, integrity
-pnpm demo:attacks       # adversarial suite: 60 deterministic scenarios, invariants too
+pnpm demo:attacks       # attack suite: 60 deterministic scenarios (typed outcome + machine-checked invariants each)
 pnpm test:attacks       # same suite as a CI gate (exits non-zero on any FAIL)
 
 # Demo dashboard (Next.js)
@@ -292,7 +290,7 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 | `@agent-trust/audit` | Hash-chained Action Receipts (domain-separated SHA-256, RFC 8785 bodies), atomic append, signed checkpoints, tamper/truncation/rewrite detection |
 | `@agent-trust/gateway` | **The Trust Gateway** — composes every layer into one authorized path: PoP → replay → VC/status → delegation chain → VerifiedFacts → policy → decision receipt → idempotent executor → outcome receipt. Receipts only for authenticated actors; audit-before-side-effect; executor unreachable without gateway authorization. |
 | `@agent-trust/trust-profile` | **Trust Profiles (read model)** — contextual, evidence-based answers to "what VERIFIED evidence exists for this agent": resolved identity, active authority with evidence digests, issuer+type-scoped attestations, and aggregated history from the VERIFIED audit chain + signed checkpoint (history fails closed independently). `AgentAttestationCredential` passes the FULL VC pipeline; attestations are EVIDENCE, never authority. The profile schema structurally forbids score fields — no trust/reputation number exists, and the profile never bypasses policy. |
-| `@agent-trust/attacks` | **Adversarial suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each judges the denial reason AND the side-effect invariants (executor calls, victim attribution, cache state, profile immutability); machine-readable `artifacts/attacks/attack-report.{json,md}` |
+| `@agent-trust/attacks` | **Attack suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each declares a typed expected outcome class and is judged on machine-checked invariants (a missing checker, verdict or invariant fails), 49 also require a specific reason code (11 documented exceptions); machine-readable `artifacts/attacks/attack-report.{json,md}`; see [docs/security-assurance.md](docs/security-assurance.md) |
 
 | `apps/web` | **Demo dashboard** (Next.js, `pnpm dev`) — trust console (profile, presets, pipeline, decision, audit, evidence) + `/attacks` suite view. A pure read model: every decision comes from the real gateway server-side; no trust logic or scores in the browser. |
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
+**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`, CI green) and the judge-facing UI by PR #2 (merge commit `0a3e623`, CI green). The public Render service https://agent-trust.onrender.com was suspended for security containment, then redeployed from `0a3e623` and verified the same day (`smoke:live` 45/45; real-click UI check 15/15; `identityMode web`, `replayStore redis`; auto-deploy off). The 90-second video is optional but recommended and is not recorded yet. Re-verify the public URL immediately before submitting (free-plan sleep, state resets on restart).
 
 **Release baseline.** The original submission freeze (`c286ebd`) predates an independent audit. The post-audit repairs
 were merged by PR #1 into `main` as merge commit `e4ba7eb` (tree-identical to the tested branch head `92ff923`; CI green on
@@ -26,8 +26,8 @@ One-line description: A verifiable trust layer for AI agents combining
 
 Repo URL:            https://github.com/abuzaro21/agent-trust
 
-Live Demo URL:       https://agent-trust.onrender.com (REQUIRED — currently suspended for security
-                     containment; do NOT submit until it is redeployed from the merged code and verified).
+Live Demo URL:       https://agent-trust.onrender.com (REQUIRED — live, running 0a3e623, verified
+                     2026-10-28; re-verify just before submitting).
                      Runs from one command:
                        git clone https://github.com/abuzaro21/agent-trust
                        cd agent-trust
@@ -53,9 +53,11 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       (52 attacks + 8 failure demos) across identity,
                       credentials, authority, status, replay, policy,
                       audit, attestation, did:web transport, and
-                      infrastructure — each judged on the denial reason AND
-                      side-effect invariants (the executor really did not
-                      run; a spoof is never attributed to the victim).
+                      infrastructure — each judged on a typed expected outcome and
+                      machine-checked invariants, 49 of 60 also on a specific reason code
+                      (the executor really did not run; a spoof is never
+                      attributed to the victim; a corrupted policy bundle
+                      never yields an engine).
                       Every dependency fails CLOSED (a policy-engine crash
                       denies without a receipt). An independent post-freeze
                       audit found and fixed audit-chain poisoning, a dropped
@@ -125,8 +127,12 @@ Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at 71b3ef6; la
   (packages/status, 5 s default) that passes alone in ~2 s; it is unrelated to this branch (no package changed).
 
 Public service (https://agent-trust.onrender.com):
-  SUSPENDED for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b).
-  smoke:live was 45/45 against that old build on 2026-10-28; it has NOT been run against a deployment of the merged code.
+  Was suspended for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b), then resumed and
+  redeployed from 0a3e623 (Render deploy dep-dbgvq5egekts738vh0ug) the same day; the previous build was reachable for
+  approximately 87 s during the cutover (first observed answering health polling at +24 s after the resume; the new deploy was live at +111 s; the exact cutover time was not recorded).
+  Verified on the deployed build: /api/health build.sha 0a3e623, identityMode web; /api/demo/status replayStore redis;
+  smoke:live 45/45; real-click UI check 15/15 (120 SAR allowed, 5,000 SAR denied, comparison, spoof, revoked, replay,
+  audit chain valid, 60/60 report); a scan of 400 build-log and 150 runtime-log lines found zero secret-pattern matches and zero real errors in those samples. Auto-deploy remains off.
 ```
 
 Independent review: a read-only audit by a second model family (Codex GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass

@@ -96,8 +96,8 @@ export interface AttackScenarioDto {
   category: string;
   title: string;
   status: 'PASS' | 'FAIL';
-  expected: { outcome: string; reasonCode?: string };
-  observed: { outcome: string; reasonCodes: string[]; invariants: Record<string, unknown> };
+  expected: { outcome: string; verdict?: string; reasonCode?: string; noReasonCode?: string };
+  observed: { outcome: string; verdict?: string; reasonCodes: string[]; invariants: Record<string, unknown> };
   durationMs: number;
   detail?: string;
 }

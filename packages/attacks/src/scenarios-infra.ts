@@ -12,7 +12,7 @@ export const INFRA_001: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'Audit store unavailable after policy ALLOW — no side effect without a durable decision',
-  expected: { outcome: 'DENY, executor never runs', reasonCode: 'AUDIT_LOG_UNAVAILABLE' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'DENY, executor never runs', reasonCode: 'AUDIT_LOG_UNAVAILABLE' },
   async run() {
     const w = await buildAttackWorld();
     const failingLog = {
@@ -28,8 +28,9 @@ export const INFRA_001: AttackScenario = {
       outcome: result.effect === 'DENY' && result.stages.policy === 'ALLOW'
         ? `policy allowed, but audit-before-side-effect denied (audit=${result.stages.audit})`
         : result.outcome,
+      verdict: result.effect === 'DENY' ? 'FAILED_SAFE' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyAllowedThenAuditVeto: result.stages.policy === 'ALLOW' },
     };
   },
 };
@@ -39,22 +40,30 @@ export const INFRA_002: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'Executor fails after a legitimate ALLOW — honest FAILED outcome receipt',
-  expected: { outcome: 'ALLOW decision preserved; execution outcome is FAILED (never faked as success)' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'ALLOW decision preserved; execution outcome is FAILED (never faked as success)', reasonCode: 'WITHIN_SCOPE' },
   async run() {
     const w = await buildAttackWorld();
     const failing = new (await import('../../gateway/src/executor.js')).DemoRefundExecutor({ failTaskIds: ['atk_exec_fail'] });
     const gateway = new (await import('../../gateway/src/gateway.js')).TrustGateway({ ...w.gatewayDeps, executor: failing });
     const result = await gateway.handleTask(await w.task({ taskId: 'atk_exec_fail' }));
     const chain = await w.auditLog.readStream(STREAM);
-    const outcome = chain.find((r) => r.body.receiptId === result.executionReceiptId);
+    // Both receipts must be FOUND in the chain by id (an absent id never matches anything).
+    const decision = result.decisionReceiptId === undefined ? undefined : chain.find((r) => r.body.receiptId === result.decisionReceiptId);
+    const outcome = result.executionReceiptId === undefined ? undefined : chain.find((r) => r.body.receiptId === result.executionReceiptId);
+    const chained =
+      decision !== undefined &&
+      outcome !== undefined &&
+      outcome.body.correlation?.decisionReceiptId === decision.body.receiptId &&
+      outcome.body.sequence > decision.body.sequence;
     return {
       outcome: `decision=${result.effect}, execution=${result.stages.execution}, outcome receipt=${outcome?.body.execution?.state}`,
-      reasonCodes: [],
+      verdict: result.effect === 'ALLOW' && outcome?.body.execution?.state === 'FAILED' && chained ? 'FAILED_SAFE' : 'BREACHED',
+      reasonCodes: result.reasonCodes,
       invariants: {
         decisionEffect: result.effect,
-        outcomeState: outcome?.body.execution?.state,
-        decisionAndOutcomeChained:
-          outcome?.body.correlation?.decisionReceiptId === result.decisionReceiptId,
+        decisionReceiptEffect: decision?.body.decision.effect ?? null,
+        outcomeState: outcome?.body.execution?.state ?? null,
+        decisionAndOutcomeChained: chained,
       },
     };
   },
@@ -65,7 +74,7 @@ export const INFRA_003: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'Execution succeeds but outcome receipt cannot be persisted — EXECUTION_UNCERTAIN, never blind retry',
-  expected: { outcome: 'EXECUTION_UNCERTAIN + AUDIT_OUTCOME_UNRECORDED; side effect not re-run', reasonCode: 'AUDIT_OUTCOME_UNRECORDED' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'EXECUTION_UNCERTAIN + AUDIT_OUTCOME_UNRECORDED; side effect not re-run', reasonCode: 'AUDIT_OUTCOME_UNRECORDED' },
   async run() {
     const w = await buildAttackWorld();
     // Decision append (1st) succeeds; outcome append (2nd) fails.
@@ -84,8 +93,9 @@ export const INFRA_003: AttackScenario = {
     // Prove the side effect ran EXACTLY ONCE and was not blindly retried.
     return {
       outcome: `result=${result.outcome}; executor calls=${w.executor.callCount.total} (no retry)`,
+      verdict: result.outcome === 'EXECUTION_UNCERTAIN' && w.executor.callCount.total === 1 ? 'FAILED_SAFE' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total, outcome: result.outcome },
+      invariants: { executorCalls: w.executor.callCount.total, outcome: result.outcome, auditAppendAttempts: appends },
     };
   },
 };
@@ -95,7 +105,7 @@ export const INFRA_004: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'OPA engine crash inside evaluate — fail closed (no receipt: policy identity unknown; chain stays valid)',
-  expected: { outcome: 'DENY, executor untouched', reasonCode: 'POLICY_EVALUATION_ERROR' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'DENY, executor untouched', reasonCode: 'POLICY_EVALUATION_ERROR' },
   async run() {
     const w = await buildAttackWorld();
     const brokenPolicy = {
@@ -107,6 +117,7 @@ export const INFRA_004: AttackScenario = {
     const result = await gateway.handleTask(await w.task({ taskId: 'atk_opa_crash' }));
     return {
       outcome: `policy=${result.stages.policy}, executor calls=${w.executor.callCount.total}`,
+      verdict: result.effect === 'DENY' ? 'FAILED_SAFE' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total },
     };
@@ -118,7 +129,7 @@ export const INFRA_005: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'Redis (replay store) outage on a protected write — fail closed before policy',
-  expected: { outcome: 'DENY before policy evaluation', reasonCode: 'REPLAY_PROTECTION_UNAVAILABLE' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'DENY before policy evaluation', reasonCode: 'REPLAY_PROTECTION_UNAVAILABLE' },
   async run() {
     const w = await buildAttackWorld();
     const { ReplayProtector } = await import('@agent-trust/replay');
@@ -132,6 +143,7 @@ export const INFRA_005: AttackScenario = {
     const result = await gateway.handleTask(await w.task({ taskId: 'atk_redis_down' }));
     return {
       outcome: `replay=${result.stages.replay}, policy=${result.stages.policy}, executor calls=${w.executor.callCount.total}`,
+      verdict: result.effect === 'DENY' ? 'FAILED_SAFE' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policySkipped: result.stages.policy === 'NOT_RUN' },
     };

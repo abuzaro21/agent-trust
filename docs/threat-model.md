@@ -56,7 +56,7 @@ Honest failure engineering beats an unrealistic detection claim — in front of 
 
 ## Adversarial Attack Matrix (executable, deterministic)
 
-Every scenario below is a registered case in `packages/attacks` and runs end-to-end via `pnpm demo:attacks` (CI: `pnpm test:attacks`). A scenario PASSES only when **both** the expected denial reason **and** the side-effect invariants hold: executor call counts, victim receipt attribution, policy/attenuation stage gates, replay-store state, cache contents, and victim trust-profile immutability. "Attack blocked" is never inferred from a reason code alone.
+Every scenario below is a registered case in `packages/attacks` and runs end-to-end via `pnpm demo:attacks` (CI: `pnpm test:attacks`). A scenario PASSES only when **all** of the following hold: it declares a typed expected verdict (`DENIED`, `REFUSED`, `DETECTED`, `CONTAINED` or `FAILED_SAFE`) and the observed typed verdict equals it; its reason-code policy holds (a specific reason code for 49 scenarios; for 11 an explicit written justification — the `DIDWEB-*` scenarios, whose resolver and transport report typed DID-Core / transport errors rather than gateway reason codes, which the checkers pin instead); and a registered invariant checker accepts the recorded evidence. A missing checker, verdict, or invariant key fails the scenario; the human-readable outcome string is display-only. Invariants are the scenario's own state or side-effect evidence (executor and policy call counts, the credential stage, whether a policy engine was produced, whether anything was cached, whether untouched history verified before tampering, what a consumer such as the trust profile concluded). Many scenarios also carry a positive control (the legitimate counterpart is accepted by the same code), so a refusal cannot be an artifact of a broken fixture. Details, limits and the product-mutation evidence: [security-assurance.md](security-assurance.md).
 
 Positive control (every category): a legitimate 120 SAR refund through the identical pipeline → `ALLOW` + `SUCCEEDED`, so the matrix proves the fabric denies *attackers*, not agents.
 
@@ -111,7 +111,7 @@ Full matrix (regenerate: `pnpm demo:attacks`, see `artifacts/attacks/attack-repo
 | Cross-stream substitution: receipts from another stream spliced in | AUDIT | hash chain + signed checkpoint | fail-closed / invariant | NO | AUDIT-006 |  |
 | Full-chain rewrite: old receipt modified, all later hashes recomputed | AUDIT | hash chain + signed checkpoint | fail-closed / invariant | NO | AUDIT-007 |  |
 | Truncation: tail receipts deleted after the checkpoint anchored them | AUDIT | hash chain + signed checkpoint | fail-closed / invariant | NO | AUDIT-008 |  |
-| Forged checkpoint signed by the wrong key | AUDIT | hash chain + signed checkpoint | fail-closed / invariant | NO | AUDIT-009 |  |
+| Forged checkpoint: wrong signer, forged signature, edited payload, or another stream | AUDIT | hash chain + signed checkpoint | fail-closed / invariant | NO | AUDIT-009 |  |
 | Fake vouch from an untrusted issuer (signature may be valid) | ATTESTATION | full pipeline + issuer/type trust | fail-closed / invariant | NO | ATTEST-001 |  |
 | 100 Sybil vouches — count is not trust | ATTESTATION | full pipeline + issuer/type trust | fail-closed / invariant | NO | ATTEST-002 |  |
 | Trusted attestations but NO delegation credential — gateway must still deny | ATTESTATION | full pipeline + issuer/type trust | REQUEST_MALFORMED | NO | ATTEST-003 |  |
@@ -173,6 +173,10 @@ These were found by an independent code audit, are **not** fixed in P0, and are 
 | Policy-engine crash leaves no decision receipt | Denied and unexecuted, but unrecorded | Receipt schema requires a real policy hash |
 | Checkpoints have no independent anchor | Integrity against a compromised process that holds both log and signer is not claimed | Signed checkpoint proves internal consistency only |
 | Public API signs for the demo SupportAgent | Not caller authentication | The executor is a simulation |
+| Checkpoint anchoring compares sequence and head hash only (`verifyAuditAgainstCheckpoint`) | It does not re-verify interior receipts; an interior mutation is caught by `verifyAuditChain`, and the trust-profile consumer runs both and fails closed | Layered by design; `AUDIT-001`/`002` assert the chain verifier and the consumer, not the anchoring function |
+| Checkpoint signer pin is the caller's responsibility (`expectedSignerDid`) | A caller that omits it accepts any resolvable signer | Production callers in this repo pin it; `AUDIT-009` exercises the pinned path |
+| Delegation attenuation scenarios (`AUTHORITY-005`/`006`) call the walker directly | The gateway accepts a single delegation link, so these do not run through it | Multi-hop is not presented through the gateway (fails closed); the walker is property-tested |
+| Attack scenarios run with a frozen clock, an in-memory process-local audit log and a simulated executor | They prove the control logic, not durability, wall-clock behaviour or a real payment rail | Demo scope; stated wherever the suite is described |
 | Status-list mutation locking is process-local | Does not protect multiple writer processes | Single-replica demo |
 
 ## Provenance Integrity Tests

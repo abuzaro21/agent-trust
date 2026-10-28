@@ -85,14 +85,26 @@ leak scans of API responses + HTML + JS bundles.
 
 ## Public status (2026-10-28)
 
-A Render **free** web service `agent-trust` (Docker, Frankfurt, one instance) and a free Render Key Value `agent-trust-redis` exist in
-the account's workspace, serving https://agent-trust.onrender.com with real did:web identities and Redis-backed replay. It was last
-deployed manually on 2026-09-15 from the **pre-audit** commit `4c25b4b` and passed `smoke:live` 45/45 on 2026-10-28.
+A Render **free** web service `agent-trust` (Docker, Frankfurt, one instance) and a free Render Key Value `agent-trust-redis` serve
+https://agent-trust.onrender.com with real did:web identities and Redis-backed replay. It had been deployed manually on 2026-09-15
+from the **pre-audit** commit `4c25b4b`; because that build had a confirmed audit-chain-poisoning flaw it was **suspended** and its
+auto-deploy turned **off** on 2026-10-28. The fix was merged by PR #1 (merge commit `e4ba7eb`, CI green) and the judge-facing UI by
+PR #2 (merge commit `0a3e623`, CI green).
 
-Because that build had a confirmed audit-chain-poisoning flaw, the service was **suspended** and its auto-deploy turned **off** on
-2026-10-28. The fix was merged by PR #1 (merge commit `e4ba7eb`, CI green). Redeploying the exact merged commit and re-verifying it
-(health SHA, `identityMode=web`, `replayStore=redis`, `smoke:live` 45/45, presets, audit chain) is the remaining step; whether Render
-accepts a deploy while a service is suspended is not documented, so the first attempt may require resuming it.
+**Redeploy (2026-10-28, approved controlled operation).** Render refuses to deploy a suspended service (`render deploys create` →
+HTTP 400 `cannot deploy suspended service`), so the service was **resumed and the exact commit deployed in one scripted run** with a
+10-minute fail-safe (suspend on failure or timeout). Render did not create a deploy on resume; the API deploy for `0a3e623` went
+live 111 s after the resume (deploy `dep-dbgvq5egekts738vh0ug`). **Exposure note:** the previous build `4c25b4b` first answered plain `/api/health` polling 24 s after the resume (no other requests
+were sent to it); Render marked the new deployment live at 111 s, so the interval was approximately 87 s; the exact public cutover time
+was not recorded. The older deploys are `deactivated`.
+
+**Verified on the deployed build:** `/api/health` → `status ok`, `identityMode web`, `build.sha 0a3e623` (matches Render's deployed
+commit); `/api/demo/status` → `replayStore redis`; `pnpm smoke:live` **45/45**; a real-click browser check of the public site
+**15/15** (grant read from the backend, 120 SAR allowed, 5,000 SAR denied, comparison from the two responses, spoof / revoked /
+replay, audit chain and checkpoint valid, 60/60 report); a scan of 400 build-log and 150 runtime-log lines found zero
+secret-pattern matches and zero real errors in those samples (the app logs nothing per request after startup). Service flags afterwards: not suspended, auto-deploy **off**, plan Free. The service still carries a `DEMO_BUILD_SHA`
+environment variable from the earlier deploy; the app prefers Render's `RENDER_GIT_COMMIT`, so the reported SHA is correct. Re-verify
+before submitting: the free plan sleeps after about 15 minutes idle and demo state resets on restart.
 
 ## Abuse scope (16S/16W/16V)
 
@@ -190,8 +202,8 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Demo presets (8) against the container | PASS — same reason codes as documented |
 | Malformed-input exploit (`amount` −5 / 0 / "abc", `currency` "SARX") against the container | PASS — `REQUEST_MALFORMED`, no receipt, audit `chain.valid: true` |
 | `GET /api/attacks/report?run=1` | PASS — serves the stored artifact; runs nothing |
-| `smoke:live` (45 checks) against https://agent-trust.onrender.com | PASS 45/45 on 2026-10-28 — **but that service runs the pre-audit build `4c25b4b`**, not this branch (the smoke needs only the public URL, not private keys) |
-| Redeploy of the release commit to Render | NOT RUN — requires approval |
+| `smoke:live` (45 checks) against https://agent-trust.onrender.com | PASS 45/45 on 2026-10-28 against the **deployed `0a3e623`** (an earlier run that day, 45/45 against the old `4c25b4b`, is superseded) |
+| Redeploy of the release commit to Render | DONE 2026-10-28 — controlled resume + deploy of `0a3e623` (see "Public status"); health, status, smoke and UI checks passed on the deployed build |
 
 Known cosmetic caveat: the `/attacks` page badge `baseline 414cbaa` is a historical constant in `packages/attacks/src/runner.ts`
 (the commit the suite was first baselined at), **not** the build SHA — do not narrate it as the deployed commit.

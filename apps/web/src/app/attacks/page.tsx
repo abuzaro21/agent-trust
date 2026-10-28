@@ -49,10 +49,10 @@ export default function AttacksPage() {
 
       <main id="main">
         <section className="hero" style={{ paddingBottom: 0 }}>
-          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Every attack is checked twice.</h1>
+          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Sixty security scenarios, each checked against a typed expected outcome.</h1>
           <p className="lead">
-            Each scenario asserts the expected outcome <strong>and</strong> its side-effect invariants — for example that the executor did not run when a request should be denied, and that a spoof is never attributed to its victim.
-          </p>
+            Every scenario declares an expected outcome class and is judged on machine-checked invariants — for example that the executor and policy never ran on a denial, that a corrupted policy bundle never produces an engine, and that untouched audit history verifies before it is tampered with. 49 also require a specific reason code; the other 11 (did:web resolver and transport errors) record why they have none. A scenario fails if its checker or evidence is missing.
+            </p>
         </section>
 
         <div className="callout" style={{ marginTop: 'var(--s5)' }}>
@@ -170,14 +170,20 @@ function ScenarioCard(props: { sc: AttackScenarioDto; open: boolean; onToggle: (
           <span aria-hidden style={{ color: passed ? 'var(--ok)' : 'var(--deny)', fontWeight: 800 }}>{passed ? '✓' : '✕'}</span>
           <span className="mono">{sc.id}</span>
           <span style={{ flex: '1 1 220px', fontWeight: 520 }}>{sc.title}</span>
-          <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? 'blocked' : 'FAIL'}</span>
+          <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? (sc.observed.verdict ?? 'passed').toLowerCase().replace('_', ' ') : 'FAIL'}</span>
         </button>
       </h3>
       {props.open && (
         <div id={panel} style={{ padding: 'var(--s4)', borderTop: '1px solid var(--border)' }}>
           <dl className="kv">
             <dt>Expected</dt>
-            <dd>{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
+            <dd>{sc.expected.verdict ? `${sc.expected.verdict} — ` : ''}{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
+            {sc.expected.noReasonCode !== undefined && (
+              <>
+                <dt>No reason code</dt>
+                <dd>{sc.expected.noReasonCode}</dd>
+              </>
+            )}
             <dt>Observed</dt>
             <dd className="mono wrap-any">{sc.observed.outcome}</dd>
             {sc.observed.reasonCodes.length > 0 && (

@@ -21,13 +21,37 @@ export type AttackCategory =
 
 export type ScenarioKind = 'ATTACK' | 'FAILURE_DEMO';
 
+/**
+ * Machine-checked classification of what a scenario observed. The scenario
+ * derives it from REAL objects (a gateway result, a loader result, a
+ * verifier result) — never from prose — and the runner compares it for
+ * equality with `expected.verdict`.
+ *
+ *  - DENIED       the gateway returned effect DENY (nothing executed)
+ *  - REFUSED      a component refused the input (loader, resolver, walker, schema, attestation pipeline)
+ *  - DETECTED     an integrity check flagged tampering
+ *  - CONTAINED    the attack was processed but changed nothing it must not (replay race, Sybil vouches, cache poisoning, key rotation)
+ *  - FAILED_SAFE  an infrastructure failure was handled fail-closed or reported honestly
+ *  - BREACHED     the defence did not hold (only ever OBSERVED, never expected)
+ */
+export type Verdict = 'DENIED' | 'REFUSED' | 'DETECTED' | 'CONTAINED' | 'FAILED_SAFE' | 'BREACHED';
+export type ExpectedVerdict = Exclude<Verdict, 'BREACHED'>;
+
 export interface AttackExpected {
-  /** Human summary of the required outcome, e.g. 'DENY before policy'. */
+  /** Human description of the required outcome. DISPLAY ONLY — it is never evaluated. */
   outcome: string;
+  /** The machine-checked outcome class the scenario must observe (see Verdict). */
+  verdict: ExpectedVerdict;
+  /**
+   * Reason-code policy — EXACTLY ONE of the next three must be declared, so a
+   * forgotten check can never pass silently:
+   */
   /** The single reason code that must appear in the observed denial. */
   reasonCode?: ReasonCode;
   /** Predicate over observed reason codes (when more precision is needed). */
   reasonCodesMatch?: (codes: ReasonCode[]) => boolean;
+  /** Justification when the scenario genuinely has no reason code to assert. */
+  noReasonCode?: string;
 }
 
 export interface AttackInvariants {
@@ -46,7 +70,10 @@ export interface AttackInvariants {
 }
 
 export interface AttackObserved {
+  /** Human description of what happened. DISPLAY ONLY — never the oracle. */
   outcome: string;
+  /** Typed classification derived from real objects (see Verdict). */
+  verdict: Verdict;
   reasonCodes: ReasonCode[];
   invariants: {
     executorCalls?: number;
@@ -61,9 +88,11 @@ export interface AttackResult {
   category: AttackCategory;
   title: string;
   status: 'PASS' | 'FAIL';
-  expected: { outcome: string; reasonCode?: ReasonCode };
+  expected: { outcome: string; verdict: ExpectedVerdict; reasonCode?: ReasonCode; noReasonCode?: string };
   observed: AttackObserved;
   durationMs: number;
+  /** Every reason this scenario FAILED (empty on PASS). */
+  failures?: string[];
   detail?: string;
 }
 

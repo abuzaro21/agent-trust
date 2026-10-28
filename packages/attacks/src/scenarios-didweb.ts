@@ -18,12 +18,19 @@ async function resolverWith(respond: (url: URL) => Promise<{ status: number; hea
   return new WebDidResolver({ http: { get: async (url) => respond(url) }, clock: () => 1_000_000 });
 }
 
+/** Control: the SAME transport serving the well-formed document resolves to it. A refusal is only meaningful if this holds. */
+async function controlResolves(status = 200, headers: Record<string, string> = {}): Promise<boolean> {
+  const resolver = await resolverWith(async () => ({ status, headers, body: JSON.stringify(GOOD_DOC) }));
+  const r = await resolver.resolve(DID);
+  return r.didDocument !== null && r.didDocument.id === DID;
+}
+
 export const DIDWEB_001: AttackScenario = {
   id: 'DIDWEB-001',
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'document.id mismatch (server serves a different identity)',
-  expected: { outcome: 'resolution fails; nothing cached' },
+  expected: { verdict: 'REFUSED', outcome: 'resolution fails; nothing cached', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
     const resolver = await resolverWith(async () => ({
       status: 200, headers: {}, body: JSON.stringify({ ...GOOD_DOC, id: 'did:web:evil.example' }),
@@ -31,32 +38,54 @@ export const DIDWEB_001: AttackScenario = {
     const r = await resolver.resolve(DID);
     return {
       outcome: r.didDocument === null ? `rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { notCached: resolver.peekCache(DID) === undefined },
+      invariants: { controlResolves: await controlResolves(), resolutionError: r.didResolutionMetadata.error ?? null, notCached: resolver.peekCache(DID) === undefined },
     };
   },
 };
+
+/**
+ * Control for the SSRF scenarios: the same transport, same request, but DNS answering a PUBLIC address, DOES reach the
+ * connection stage. Without this, "blocked before connect" could just mean "this transport never connects".
+ */
+async function publicAddressConnects(): Promise<boolean> {
+  const { NodeHttpsDidWebClient } = await import('@agent-trust/did');
+  let attempts = 0;
+  const client = new NodeHttpsDidWebClient({
+    dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+    httpRequest: async () => { attempts += 1; throw new Error('control connect reached'); },
+  });
+  try {
+    await client.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
+  } catch {
+    // the control transport double always throws once it is reached; only the attempt count matters
+  }
+  return attempts === 1;
+}
 
 export const DIDWEB_002: AttackScenario = {
   id: 'DIDWEB-002',
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Private IP target (DNS → RFC1918) — denied before connect',
-  expected: { outcome: 'connection refused by network policy' },
+  expected: { verdict: 'REFUSED', outcome: 'connection refused by network policy before any connect', noReasonCode: 'the transport reports a typed DidWebTransportError(POLICY), not a gateway ReasonCode' },
   async run() {
     const { NodeHttpsDidWebClient, DidWebTransportError } = await import('@agent-trust/did');
+    let connectAttempts = 0;
     const client = new NodeHttpsDidWebClient({
       dnsLookup: async () => [{ address: '10.1.2.3', family: 4 }],
-      httpRequest: async () => { throw new Error('MUST NOT CONNECT'); },
+      httpRequest: async () => { connectAttempts += 1; throw new Error('MUST NOT CONNECT'); },
     });
     try {
       await client.get(new URL(`https://${HOST}/agents/support/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
-      return { outcome: 'UNDETECTED — connected', reasonCodes: [], invariants: {} };
+      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false } };
     } catch (e) {
       return {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
+        verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY' },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -67,21 +96,23 @@ export const DIDWEB_003: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Loopback target (DNS → 127.0.0.1)',
-  expected: { outcome: 'connection refused by network policy' },
+  expected: { verdict: 'REFUSED', outcome: 'connection refused by network policy before any connect', noReasonCode: 'the transport reports a typed DidWebTransportError(POLICY), not a gateway ReasonCode' },
   async run() {
     const { NodeHttpsDidWebClient, DidWebTransportError } = await import('@agent-trust/did');
+    let connectAttempts = 0;
     const client = new NodeHttpsDidWebClient({
       dnsLookup: async () => [{ address: '127.0.0.1', family: 4 }],
-      httpRequest: async () => { throw new Error('MUST NOT CONNECT'); },
+      httpRequest: async () => { connectAttempts += 1; throw new Error('MUST NOT CONNECT'); },
     });
     try {
       await client.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
-      return { outcome: 'UNDETECTED — connected', reasonCodes: [], invariants: {} };
+      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false } };
     } catch (e) {
       return {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
+        verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY' },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -92,21 +123,23 @@ export const DIDWEB_004: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Cloud metadata / link-local target (DNS → 169.254.169.254)',
-  expected: { outcome: 'connection refused by network policy' },
+  expected: { verdict: 'REFUSED', outcome: 'connection refused by network policy before any connect', noReasonCode: 'the transport reports a typed DidWebTransportError(POLICY), not a gateway ReasonCode' },
   async run() {
     const { NodeHttpsDidWebClient, DidWebTransportError } = await import('@agent-trust/did');
+    let connectAttempts = 0;
     const client = new NodeHttpsDidWebClient({
       dnsLookup: async () => [{ address: '169.254.169.254', family: 4 }],
-      httpRequest: async () => { throw new Error('MUST NOT CONNECT'); },
+      httpRequest: async () => { connectAttempts += 1; throw new Error('MUST NOT CONNECT'); },
     });
     try {
       await client.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
-      return { outcome: 'UNDETECTED — connected', reasonCodes: [], invariants: {} };
+      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false } };
     } catch (e) {
       return {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
+        verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY' },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -117,23 +150,40 @@ export const DIDWEB_005: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'DNS rebinding: validated hostname, connection address turns private',
-  expected: { outcome: 'address-pinned transport blocks the rebinding' },
+  expected: { verdict: 'REFUSED', outcome: 'address-pinned transport blocks the rebinding before any connect', noReasonCode: 'the transport reports a typed DidWebTransportError(POLICY), not a gateway ReasonCode' },
   async run() {
     const { NodeHttpsDidWebClient, DidWebTransportError } = await import('@agent-trust/did');
     // Single lookup returning the private address = the rebinding end-state;
     // the transport classifies EVERY address it will connect to.
+    let connectAttempts = 0;
     const client = new NodeHttpsDidWebClient({
       dnsLookup: async () => [{ address: '192.168.0.7', family: 4 }],
-      httpRequest: async () => { throw new Error('MUST NOT CONNECT'); },
+      httpRequest: async () => { connectAttempts += 1; throw new Error('MUST NOT CONNECT'); },
     });
+    // Pinning: DNS answers a PUBLIC address on the first lookup and a PRIVATE one on any later lookup (the rebinding
+    // race). The transport must resolve ONCE and hand the validated address to the connection primitive.
+    let lookups = 0;
+    const connectedTo: string[] = [];
+    const pinning = new NodeHttpsDidWebClient({
+      dnsLookup: async () => {
+        lookups += 1;
+        return lookups === 1 ? [{ address: '93.184.216.34', family: 4 }] : [{ address: '10.0.0.5', family: 4 }];
+      },
+      httpRequest: async (input) => {
+        connectedTo.push(input.connectionAddress);
+        return { status: 200, headers: {}, streamBody: null };
+      },
+    });
+    await pinning.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
     try {
       await client.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
-      return { outcome: 'UNDETECTED — connected', reasonCodes: [], invariants: {} };
+      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false, lookupsForOneRequest: lookups, connectedAddresses: connectedTo, transportErrorCode: null } };
     } catch (e) {
       return {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `rebinding blocked (${e.message})` : String(e),
+        verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY' },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null, lookupsForOneRequest: lookups, connectedAddresses: connectedTo },
       };
     }
   },
@@ -144,7 +194,7 @@ export const DIDWEB_006: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Redirect to an internal target',
-  expected: { outcome: 'redirect rejected by policy' },
+  expected: { verdict: 'REFUSED', outcome: 'redirect rejected by policy', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
     const resolver = await resolverWith(async () => ({
       status: 302, headers: { location: 'https://internal-service.local/did.json' }, body: '',
@@ -152,8 +202,15 @@ export const DIDWEB_006: AttackScenario = {
     const r = await resolver.resolve(DID);
     return {
       outcome: r.didDocument === null ? `redirect rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        controlResolves: await controlResolves(),
+        resolutionError: r.didResolutionMetadata.error ?? null,
+        // cause: the redirect itself was refused (not merely 'some non-200'); typed marker is the stable prefix
+        redirectRefusedByPolicy: (r.didResolutionMetadata.message ?? '').startsWith('redirect rejected by policy'),
+        notCached: resolver.peekCache(DID) === undefined,
+      },
     };
   },
 };
@@ -163,22 +220,51 @@ export const DIDWEB_007: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Oversized document response',
-  expected: { outcome: 'transport TOO_LARGE, deterministic failure' },
+  expected: { verdict: 'REFUSED', outcome: 'the real transport enforces its byte cap (declared length and streamed bytes); resolution fails deterministically', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error and the transport a typed TOO_LARGE error, not a gateway ReasonCode' },
   async run() {
-    const { WebDidResolver, DidWebTransportError } = await import('@agent-trust/did');
-    const resolver = new WebDidResolver({
-      clock: () => 1_000_000,
-      http: {
-        get: async () => {
-          throw new DidWebTransportError('TOO_LARGE', 'response exceeds cap 262144 bytes');
-        },
-      },
-    });
-    const r = await resolver.resolve(DID);
+    const { NodeHttpsDidWebClient, DidWebTransportError, WebDidResolver } = await import('@agent-trust/did');
+    const url = new URL(`https://${HOST}/agents/support/did.json`);
+    // The REAL streaming transport, with only DNS and the request primitive faked (no network).
+    async function* stream(sizes: number[]) {
+      for (const n of sizes) yield new Uint8Array(n).fill(0x20);
+    }
+    const client = (headers: Record<string, string>, body: AsyncIterable<Uint8Array> | null) =>
+      new NodeHttpsDidWebClient({
+        dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+        httpRequest: async () => ({ status: 200, headers, streamBody: body }),
+      });
+    const outcome = async (c: InstanceType<typeof NodeHttpsDidWebClient>, maxBytes: number): Promise<string> => {
+      try {
+        await c.get(url, { timeoutMs: 1000, maxBytes });
+        return 'OK';
+      } catch (e) {
+        return e instanceof DidWebTransportError ? e.code : 'OTHER';
+      }
+    };
+    const declaredLength = await outcome(client({ 'content-length': '2048' }, null), 1024);
+    const streamed = await outcome(client({}, stream([600, 600])), 1024);
+    const belowLimit = await outcome(client({ 'content-length': '500' }, stream([500])), 1024);
+
+    // End to end: the resolver over the real transport refuses an oversized document and caches nothing...
+    const big = new WebDidResolver({ http: client({}, stream([150_000, 150_000])), clock: () => 1_000_000 });
+    const r = await big.resolve(DID);
+    // ...and the same resolver + transport serves a normal-sized document (control).
+    const doc = new TextEncoder().encode(JSON.stringify(GOOD_DOC));
+    const ok = new WebDidResolver({ http: client({}, (async function* () { yield doc; })()), clock: () => 1_000_000 });
+    const control = await ok.resolve(DID);
+    const refused = r.didDocument === null && declaredLength === 'TOO_LARGE' && streamed === 'TOO_LARGE';
     return {
-      outcome: r.didDocument === null ? `size-capped (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      outcome: refused ? `size-capped by the real transport (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      verdict: refused ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        declaredLengthCap: declaredLength,
+        streamedBytesCap: streamed,
+        belowLimitControl: belowLimit,
+        controlResolves: control.didDocument !== null && control.didDocument.id === DID,
+        resolutionError: r.didResolutionMetadata.error ?? null,
+        notCached: big.peekCache(DID) === undefined,
+      },
     };
   },
 };
@@ -188,7 +274,7 @@ export const DIDWEB_008: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Private key material in the served document (JWK with d)',
-  expected: { outcome: 'document rejected; never cached' },
+  expected: { verdict: 'REFUSED', outcome: 'document rejected; never cached', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
     const resolver = await resolverWith(async () => ({
       status: 200, headers: {}, body: JSON.stringify({
@@ -199,8 +285,9 @@ export const DIDWEB_008: AttackScenario = {
     const r = await resolver.resolve(DID);
     return {
       outcome: r.didDocument === null ? `rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED — private material accepted',
+      verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { notCached: resolver.peekCache(DID) === undefined },
+      invariants: { controlResolves: await controlResolves(), resolutionError: r.didResolutionMetadata.error ?? null, notCached: resolver.peekCache(DID) === undefined },
     };
   },
 };
@@ -210,19 +297,34 @@ export const DIDWEB_009: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Foreign kid: verification method owned by another DID',
-  expected: { outcome: 'kid-ownership binding fails' },
+  expected: { verdict: 'REFUSED', outcome: 'kid-ownership binding fails', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
-    const resolver = await resolverWith(async () => ({
-      status: 200, headers: {}, body: JSON.stringify({
-        id: DID,
-        verificationMethod: [{ id: 'did:web:evil.example:agent#key-1', type: 'JsonWebKey2020', controller: 'did:web:evil.example:agent', publicKeyJwk: JWK }],
-      }),
-    }));
-    const r = await resolver.resolve(DID);
+    const serve = async (method: Record<string, unknown>) => {
+      const resolver = await resolverWith(async () => ({
+        status: 200, headers: {}, body: JSON.stringify({ id: DID, verificationMethod: [method] }),
+      }));
+      const r = await resolver.resolve(DID);
+      return { refused: r.didDocument === null, cached: resolver.peekCache(DID) !== undefined, error: r.didResolutionMetadata.error ?? null };
+    };
+    const foreign = 'did:web:evil.example:agent';
+    // (a) foreign id AND foreign controller; (b) foreign id with the CORRECT controller — isolates the kid-ownership
+    // check from the controller check; (c) own id with a foreign controller — isolates the controller check.
+    const a = await serve({ id: `${foreign}#key-1`, type: 'JsonWebKey2020', controller: foreign, publicKeyJwk: JWK });
+    const b = await serve({ id: `${foreign}#key-1`, type: 'JsonWebKey2020', controller: DID, publicKeyJwk: JWK });
+    const c = await serve({ id: `${DID}#key-1`, type: 'JsonWebKey2020', controller: foreign, publicKeyJwk: JWK });
+    const all = a.refused && b.refused && c.refused;
     return {
-      outcome: r.didDocument === null ? `foreign kid rejected (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      outcome: all ? 'foreign kid and foreign controller rejected in every combination' : 'UNDETECTED',
+      verdict: all ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        controlResolves: await controlResolves(),
+        resolutionError: a.error,
+        foreignIdAndControllerRefused: a.refused,
+        foreignIdOwnControllerRefused: b.refused,
+        ownIdForeignControllerRefused: c.refused,
+        notCached: !a.cached && !b.cached && !c.cached,
+      },
     };
   },
 };
@@ -232,7 +334,7 @@ export const DIDWEB_010: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Cache poisoning: invalid document served first, valid second',
-  expected: { outcome: 'invalid never cached; valid second resolution succeeds' },
+  expected: { verdict: 'CONTAINED', outcome: 'invalid never cached; valid second resolution succeeds', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
   async run() {
     let evil = true;
     const resolver = await resolverWith(async () => ({
@@ -246,8 +348,9 @@ export const DIDWEB_010: AttackScenario = {
       outcome: r1.didDocument === null && r2.didDocument?.id === DID
         ? 'poisoned response rejected; subsequent valid resolution succeeded'
         : 'UNEXPECTED cache state',
+      verdict: r1.didDocument === null && r2.didDocument?.id === DID ? 'CONTAINED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { firstFailed: r1.didDocument === null, secondSucceeded: r2.didDocument !== null },
+      invariants: { firstFailed: r1.didDocument === null, secondSucceeded: r2.didDocument !== null, secondResolvedToExpectedDid: r2.didDocument?.id === DID },
     };
   },
 };
@@ -257,7 +360,7 @@ export const DIDWEB_011: AttackScenario = {
   category: 'DID_WEB',
   kind: 'FAILURE_DEMO',
   title: 'Emergency key rotation with max-age=0 (post-compromise publish)',
-  expected: { outcome: 'old key never survives a max-age=0 publish; every resolution re-fetches' },
+  expected: { verdict: 'CONTAINED', outcome: 'old key never survives a max-age=0 publish; every resolution re-fetches', noReasonCode: 'a cache-freshness property: no resolution failure occurs, so there is no reason code' },
   async run() {
     const { WebDidResolver } = await import('@agent-trust/did');
     const KEY_B = { kty: 'EC', crv: 'P-256', x: 'C'.repeat(43), y: 'D'.repeat(43) };
@@ -290,8 +393,9 @@ export const DIDWEB_011: AttackScenario = {
         keyBefore !== undefined && keyAfter !== undefined && keyBefore !== keyAfter
           ? `rotation observed immediately (${calls} fetches for 2 resolutions — max-age=0 honored)`
           : 'STALE KEY SURVIVED (bug)',
+      verdict: keyBefore !== undefined && keyAfter !== undefined && JSON.stringify(keyBefore) !== JSON.stringify(keyAfter) ? 'CONTAINED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { refetchedEveryResolve: calls === 2, keyRotated: keyBefore !== keyAfter },
+      invariants: { refetchedEveryResolve: calls === 2, keyRotated: JSON.stringify(keyBefore) !== JSON.stringify(keyAfter), keyAfterIsRotatedKey: JSON.stringify(keyAfter) === JSON.stringify(KEY_B) },
     };
   },
 };

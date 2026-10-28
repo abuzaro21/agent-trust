@@ -1,14 +1,15 @@
 import type { AttackObserved, AttackResult, AttackScenario } from './types.js';
 import { ATTACK_REGISTRY, INVARIANT_CHECKS } from './registry.js';
+import { judge, type InvariantCheck } from './oracle.js';
 import { NOW } from './world.js';
-import type { ReasonCode } from '@agent-trust/schemas';
 
 /**
- * Step 13N/13O — the deterministic runner. A scenario PASSes only when:
- *   (a) the expected reason code (or predicate) is observed, AND
- *   (b) the outcome summary is not an UNDETECTED/UNEXPECTED marker, AND
- *   (c) the security invariants for that scenario hold (executor calls,
- *       victim history, cache state, …) — denial alone is not proof.
+ * Step 13N/13O — the deterministic runner. The oracle lives in ./oracle.ts:
+ * a scenario PASSes only when it declares a typed expected verdict and
+ * exactly one reason-code policy, the observed TYPED verdict equals it, the
+ * reason-code policy holds, a registered invariant checker exists and
+ * accepts the observation, and the human outcome text carries no failure
+ * marker (defence in depth). Missing pieces FAIL; an exception FAILs.
  */
 
 export interface AttackRunSummary {
@@ -27,15 +28,8 @@ export interface AttackReport {
   scenarios: AttackResult[];
 }
 
-function outcomeLooksBad(o: AttackObserved): boolean {
-  return /UNDETECTED|UNEXPECTED|UNUSUAL|STALE KEY SURVIVED|UNEXPECTED CACHE|connected \(unexpected\)/i.test(o.outcome);
-}
-
-function reasonMatches(s: AttackScenario, codes: ReasonCode[]): boolean {
-  if (s.expected.reasonCodesMatch !== undefined) return s.expected.reasonCodesMatch(codes);
-  if (s.expected.reasonCode !== undefined) return codes.includes(s.expected.reasonCode);
-  return true; // outcome+invariants carry the judgment
-}
+/** Pure: judge one scenario against one observation with a given checker (also used by the negative-control tests). */
+export { judge };
 
 export async function runAttackSuite(opts: { only?: string[] } = {}): Promise<AttackReport> {
   const results: AttackResult[] = [];
@@ -45,20 +39,15 @@ export async function runAttackSuite(opts: { only?: string[] } = {}): Promise<At
   for (const sc of scenarios) {
     const started = performance.now();
     let observed: AttackObserved;
-    let invariantOk = false;
-    let detail: string | undefined;
+    let failures: string[];
     try {
       observed = await sc.run({ now: NOW });
-      const check = INVARIANT_CHECKS[sc.id];
-      const inv = check ? check(observed) : { ok: true };
-      invariantOk = inv.ok;
-      detail = 'detail' in inv ? (inv.detail as string | undefined) : undefined;
+      failures = judge(sc, observed, (INVARIANT_CHECKS as Record<string, InvariantCheck | undefined>)[sc.id]).failures;
     } catch (e) {
-      observed = { outcome: `EXCEPTION: ${String(e)}`, reasonCodes: [], invariants: {} };
-      detail = String(e);
+      observed = { outcome: `EXCEPTION: ${String(e)}`, verdict: 'BREACHED', reasonCodes: [], invariants: {} };
+      failures = [`scenario threw: ${String(e)}`];
     }
-    const status: AttackResult['status'] =
-      reasonMatches(sc, observed.reasonCodes) && !outcomeLooksBad(observed) && invariantOk ? 'PASS' : 'FAIL';
+    const status: AttackResult['status'] = failures.length === 0 ? 'PASS' : 'FAIL';
     results.push({
       id: sc.id,
       kind: sc.kind,
@@ -67,11 +56,13 @@ export async function runAttackSuite(opts: { only?: string[] } = {}): Promise<At
       status,
       expected: {
         outcome: sc.expected.outcome,
+        verdict: sc.expected.verdict,
         ...(sc.expected.reasonCode !== undefined ? { reasonCode: sc.expected.reasonCode } : {}),
+        ...(sc.expected.noReasonCode !== undefined ? { noReasonCode: sc.expected.noReasonCode } : {}),
       },
       observed,
       durationMs: Math.round((performance.now() - started) * 10) / 10,
-      ...(detail !== undefined ? { detail } : {}),
+      ...(failures.length > 0 ? { failures, detail: failures.join(' | ') } : {}),
     });
   }
 

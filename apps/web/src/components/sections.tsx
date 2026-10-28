@@ -782,8 +782,8 @@ export function ReportSummary({ report, error }: { report: AttackReportDto | nul
             </div>
           </details>
           <p className="note">
-            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario checks the expected reason and its own
-            side-effect invariants (for example, that the executor did not run on a denial). <a href="/attacks">Open the full report →</a> · <a href={`${REPO}/tree/main/packages/attacks`}>suite source</a>
+            Generated when the container image was built and served as a stored report — it did <strong>not</strong> run when this page loaded. Each scenario declares a typed expected outcome and is judged on machine-checked
+            invariants (for example, that the executor and policy did not run on a denial). <a href="/attacks">Open the full report →</a> · <a href={`${REPO}/tree/main/packages/attacks`}>suite source</a>
           </p>
         </>
       )}
