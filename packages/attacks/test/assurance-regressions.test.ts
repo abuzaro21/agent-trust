@@ -320,3 +320,32 @@ describe('audit-review findings (second independent audit), now closed', () => {
     }
   });
 });
+
+describe('STATUS-003 reaches BOTH verifier quarantine stages independently (final audit finding)', () => {
+  it('records a passing control and a quarantine denial from each stage', async () => {
+    const o = await observe('STATUS-003');
+    expect(o.invariants).toMatchObject({
+      verifierControlBeforeQuarantine: ['ACCEPTED'],
+      verifiedSubjectStageReasons: ['AGENT_QUARANTINED'],
+      earlyActorStageReasons: ['AGENT_QUARANTINED'],
+    });
+  });
+
+  it('NEGATIVE CONTROL: if either stage stopped denying (accepting, or the WRONG_SUBJECT precedence change), STATUS-003 FAILS', async () => {
+    const o = await observe('STATUS-003');
+    const check = INVARIANT_CHECKS['STATUS-003']!;
+    expect(check({ ...o, invariants: { ...o.invariants, verifiedSubjectStageReasons: ['ACCEPTED'] } }).ok).toBe(false); // stage 7b removed
+    expect(check({ ...o, invariants: { ...o.invariants, earlyActorStageReasons: ['WRONG_SUBJECT'] } }).ok).toBe(false); // stage 2b removed
+    expect(check({ ...o, invariants: { ...o.invariants, verifierControlBeforeQuarantine: ['AGENT_QUARANTINED'] } }).ok).toBe(false); // dead control
+  });
+});
+
+describe('CREDENTIAL-002 pins the verifier kid/issuer binding independently of the resolver (final audit follow-up)', () => {
+  it('a permissive resolver that lists the attacker key still cannot make the forged credential acceptable', async () => {
+    const o = await observe('CREDENTIAL-002');
+    expect(o.invariants).toMatchObject({ permissiveResolverControl: ['ACCEPTED'], permissiveResolverForgedReasons: ['VC_ISSUER_KEY_MISMATCH'] });
+    const check = INVARIANT_CHECKS['CREDENTIAL-002']!;
+    expect(check({ ...o, invariants: { ...o.invariants, permissiveResolverForgedReasons: ['ACCEPTED'] } }).ok).toBe(false);
+    expect(check({ ...o, invariants: { ...o.invariants, permissiveResolverControl: ['VC_SIGNATURE_INVALID'] } }).ok).toBe(false);
+  });
+});

@@ -61,13 +61,36 @@ export const STATUS_003: AttackScenario = {
   expected: { verdict: 'DENIED', outcome: 'DENY at quarantine stage', reasonCode: 'AGENT_QUARANTINED' },
   async run() {
     const w = await buildAttackWorld();
-    w.quarantine.quarantine('did:web:trust.example.com:agents:support', 'suspected key compromise');
+    const SUPPORT = 'did:web:trust.example.com:agents:support';
+    const verifier = w.gatewayDeps.verifier;
+    const codes = (v: { valid: boolean; reasonCodes?: string[] }): string[] => (v.valid ? ['ACCEPTED'] : (v.reasonCodes ?? []));
+    // A credential for a DIFFERENT subject, to isolate the early (caller-attested actor) quarantine stage.
+    const { jws: otherSubjectJws } = await w.issuer.issueDelegation({
+      subjectDid: 'did:web:trust.example.com:agents:runner',
+      authority: { actions: ['refund:create'], resources: ['order:*'], audience: ['did:web:trust.example.com:agents:refund'], limits: { amount: 500, currency: 'SAR' }, delegationDepth: 0 },
+      validFrom: NOW - 3600,
+      validUntil: NOW + 86_400,
+    });
+    // Control: BEFORE quarantine the same credential verifies without any expected subject.
+    const control = await verifier.verify(w.delegationJws, { now: NOW });
+    w.quarantine.quarantine(SUPPORT, 'suspected key compromise');
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_quar' }));
+    // Verifier-level cases, each reaching exactly ONE of the two quarantine stages:
+    //  - verified-subject stage: no expectedSubject, so only the check on the signature-bound subject can catch it;
+    //  - early actor stage: the quarantined actor presents a credential for ANOTHER subject (otherwise WRONG_SUBJECT).
+    const verifiedSubjectStage = await verifier.verify(w.delegationJws, { now: NOW });
+    const earlyActorStage = await verifier.verify(otherSubjectJws, { now: NOW, expectedSubject: SUPPORT });
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage identity=${result.stages.identity})` : result.outcome,
       verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
+      invariants: {
+        executorCalls: w.executor.callCount.total,
+        policyCalls: w.policyCalls.n,
+        verifierControlBeforeQuarantine: codes(control),
+        verifiedSubjectStageReasons: codes(verifiedSubjectStage),
+        earlyActorStageReasons: codes(earlyActorStage),
+      },
     };
   },
 };

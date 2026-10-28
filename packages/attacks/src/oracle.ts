@@ -40,20 +40,43 @@ export function strictEqual(a: unknown, b: unknown): boolean {
   if (ta === 'number') return Number.isFinite(a as number) && a === b;
   if (ta === 'string' || ta === 'boolean') return a === b;
   if (ta !== 'object') return false;
+  if (!isPlainData(a as object) || !isPlainData(b as object)) return false;
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      // A sparse array's holes are skipped by every()/forEach(); compare by index and require both sides to have the slot.
-      if (!(i in a) || !(i in b) || !strictEqual(a[i], b[i])) return false;
-    }
-    return true;
+    // isPlainData guarantees only own DATA elements (no holes, no inherited slots, no extra properties)
+    return a.every((_, i) => strictEqual(a[i], b[i]));
   }
-  const plain = (o: object) => { const p = Object.getPrototypeOf(o); return p === Object.prototype || p === null; };
-  if (!plain(a as object) || !plain(b as object)) return false;
   const ka = Object.keys(a as object);
   const kb = Object.keys(b as object);
   if (ka.length !== kb.length) return false;
   return ka.every((k) => hasOwn(b as object, k) && strictEqual((a as Inv)[k], (b as Inv)[k]));
+}
+
+/**
+ * JSON-like DATA only: a plain Object/Array (exact prototype), every own property an enumerable string-keyed DATA
+ * property (no accessors, no symbols, no non-index extras on arrays such as a custom toJSON), and arrays with every
+ * index present as an OWN element (a hole filled by the prototype chain does not count).
+ */
+function isPlainData(o: object): boolean {
+  const proto = Object.getPrototypeOf(o);
+  if (Array.isArray(o)) {
+    if (proto !== Array.prototype) return false;
+    if (Object.getOwnPropertySymbols(o).length > 0) return false;
+    // own keys must be exactly the indices 0..length-1 (+ the non-enumerable length)
+    const keys = Object.getOwnPropertyNames(o).filter((k) => k !== 'length');
+    if (keys.length !== o.length) return false;
+    for (let i = 0; i < o.length; i++) {
+      const d = Object.getOwnPropertyDescriptor(o, String(i));
+      if (d === undefined || !('value' in d) || d.enumerable !== true) return false;
+    }
+    return true;
+  }
+  if (proto !== Object.prototype && proto !== null) return false;
+  if (Object.getOwnPropertySymbols(o).length > 0) return false;
+  return Object.getOwnPropertyNames(o).every((k) => {
+    const d = Object.getOwnPropertyDescriptor(o, k);
+    return d !== undefined && 'value' in d && d.enumerable === true;
+  });
 }
 
 /** Defence in depth ONLY (human text). The typed verdict is the oracle. */

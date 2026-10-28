@@ -56,8 +56,8 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       infrastructure — each judged on a typed expected outcome and
                       machine-checked invariants, 49 of 60 also on a specific reason code
                       (the executor really did not run; a spoof is never
-                      attributed to the victim); POLICY-002 and STATUS-004
-                      do not assert one.
+                      attributed to the victim; a corrupted policy bundle
+                      never yields an engine).
                       Every dependency fails CLOSED (a policy-engine crash
                       denies without a receipt). An independent post-freeze
                       audit found and fixed audit-chain poisoning, a dropped

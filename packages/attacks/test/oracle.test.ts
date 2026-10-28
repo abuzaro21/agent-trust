@@ -175,6 +175,39 @@ describe('strict evidence comparison (no JSON-encoding collisions)', () => {
     expect(requireInvariants({ ...good, invariants: { r: new Array(1) } }, { r: [undefined] }).ok).toBe(false);
   });
 
+  it('rejects arrays that are not plain data: prototype-filled holes, custom toJSON, subclasses, accessors', () => {
+    const proto = Object.create(Array.prototype);
+    proto[0] = 'AUDIT_SIGNER_UNTRUSTED';
+    const inherited: string[] = Object.setPrototypeOf(new Array(1), proto);
+    expect(inherited[0]).toBe('AUDIT_SIGNER_UNTRUSTED'); // looks populated, but the element is not an own element
+    expect(strictEqual(inherited, ['AUDIT_SIGNER_UNTRUSTED'])).toBe(false);
+
+    const withToJson = Object.assign(['AUDIT_SIGNER_UNTRUSTED'], { toJSON: () => ['ACCEPTED'] });
+    expect(JSON.stringify(withToJson)).toBe('["ACCEPTED"]'); // contradictory machine evidence
+    expect(strictEqual(withToJson, ['AUDIT_SIGNER_UNTRUSTED'])).toBe(false);
+
+    class Evidence extends Array<string> {}
+    expect(strictEqual(Evidence.from(['AUDIT_SIGNER_UNTRUSTED']), ['AUDIT_SIGNER_UNTRUSTED'])).toBe(false);
+
+    const accessor: string[] = [];
+    Object.defineProperty(accessor, '0', { get: () => 'AUDIT_SIGNER_UNTRUSTED', enumerable: true });
+    expect(strictEqual(accessor, ['AUDIT_SIGNER_UNTRUSTED'])).toBe(false);
+    const accessorObject = {};
+    Object.defineProperty(accessorObject, 'a', { get: () => 1, enumerable: true });
+    expect(strictEqual(accessorObject, { a: 1 })).toBe(false);
+    expect(strictEqual(Object.assign({}, { [Symbol('s')]: 1 }), {})).toBe(false);
+  });
+
+  it('the malformed arrays above cannot make a REAL scenario checker (AUDIT-009) pass', async () => {
+    const { ATTACK_REGISTRY, INVARIANT_CHECKS, runAttackSuite } = await import('../src/index.js');
+    const r = (await runAttackSuite({ only: ['AUDIT-009'] })).scenarios[0]!;
+    const sc = ATTACK_REGISTRY.find((s) => s.id === 'AUDIT-009')!;
+    const forged = Object.assign(['AUDIT_SIGNER_UNTRUSTED'], { toJSON: () => ['ACCEPTED'] });
+    const inv = { ...r.observed.invariants, wrongSignerReasons: forged };
+    expect(judge(sc, { ...r.observed, invariants: inv }, INVARIANT_CHECKS['AUDIT-009']).status).toBe('FAIL');
+    expect(judge(sc, r.observed, INVARIANT_CHECKS['AUDIT-009']).status).toBe('PASS');
+  });
+
   it('an EMPTY expectation fails instead of passing vacuously', () => {
     expect(requireInvariants(obs({}), {}).ok).toBe(false);
     expect(requireInvariants(obs({ executorCalls: 0 }), {}).ok).toBe(false);

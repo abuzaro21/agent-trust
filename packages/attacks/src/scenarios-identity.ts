@@ -1,7 +1,8 @@
 import type { AttackScenario } from './types.js';
 import { NOW, buildAttackWorld, issueAttestation, anchorCheckpoint } from './world.js';
 import { LocalSigner, withDid } from '@agent-trust/crypto';
-import { CredentialIssuer } from '@agent-trust/vc';
+import { CredentialIssuer, CredentialVerifier, signCompactJws } from '@agent-trust/vc';
+import { BitstringStatusChecker } from '@agent-trust/status';
 import { TrustProfileService } from '@agent-trust/trust-profile';
 
 /**
@@ -173,11 +174,41 @@ export const CREDENTIAL_002: AttackScenario = {
       validUntil: NOW + 86_400,
     });
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_wrongkey', credentials: [jws] }));
+
+    // Defence in depth: the verifier binds the signing kid to the claimed issuer ITSELF, not only through the resolver.
+    // A buggy or permissive resolver whose issuer document wrongly lists the attacker's key must still not make the
+    // forged credential acceptable. (The real resolvers reject such a document; this isolates the verifier's own check.)
+    const ORG = 'did:web:trust.example.com:org';
+    const evilKid = await w.evilSigner.keyId();
+    const evilJwk = await w.evilSigner.publicKey();
+    const real = w.gatewayDeps.didResolver;
+    const permissive = {
+      supports: (d: string) => real.supports(d),
+      resolve: async (d: string) => {
+        const r = await real.resolve(d);
+        if (d !== ORG || r.didDocument === null) return r;
+        const extra = { id: evilKid, type: 'JsonWebKey2020', controller: ORG, publicKeyJwk: evilJwk };
+        return { ...r, didDocument: { ...r.didDocument, verificationMethod: [...(r.didDocument.verificationMethod ?? []), extra] } };
+      },
+    };
+    const lenient = new CredentialVerifier({ didResolver: permissive, trustStore: w.trustStore, statusChecker: new BitstringStatusChecker({ kind: 'store', store: w.statusStore }) });
+    const codes = (v: { valid: boolean; reasonCodes?: string[] }): string[] => (v.valid ? ['ACCEPTED'] : (v.reasonCodes ?? []));
+    const permissiveControl = await lenient.verify(w.delegationJws, { now: NOW });
+    // The issuer library stamps the CLAIMED issuer's DID into the kid, so hand-craft the header: same claims, but the JWS
+    // names the attacker's own kid. Only the verifier's own kid/issuer comparison stands between this and acceptance.
+    const claims = JSON.parse(Buffer.from(jws.split('.')[1]!, 'base64url').toString('utf8')) as Record<string, unknown>;
+    const handCrafted = await signCompactJws(w.evilSigner, claims);
+    const permissiveForged = await lenient.verify(handCrafted, { now: NOW });
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
       verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
+      invariants: {
+        executorCalls: w.executor.callCount.total,
+        policyCalls: w.policyCalls.n,
+        permissiveResolverControl: codes(permissiveControl),
+        permissiveResolverForgedReasons: codes(permissiveForged),
+      },
     };
   },
 };

@@ -35,9 +35,9 @@ To measure whether the suite depends on the defences it names, one defence at a 
 
 **Before the hardening**, removing the checkpoint head-hash comparison, the policy digest comparison, or the checkpoint truncation check left the suite at **60/60 PASS** (only the SSRF mutant was caught). **After**, all four are caught by exactly the scenarios that name them (`AUDIT-007`, `POLICY-001/002`, `DIDWEB-002…005`, `AUDIT-008`).
 
-A wider 33-mutant sweep over the gateway, credential verifier, replay, audit chain/checkpoint, delegation, did:web and trust-profile code found 12 initially surviving mutants. Strengthening existing scenarios (the count stays 60) closed the real gaps — checkpoint signature / payload / stream binding (`AUDIT-009`), `previousHash` linkage (`AUDIT-005`), both delegation-depth branches (`AUTHORITY-006`), did:web kid ownership and redirect refusal (`DIDWEB-009`, `DIDWEB-006`), issuer-and-type-scoped attestation trust (`ATTEST-001`). Removing both quarantine stages together is caught by `STATUS-003`.
+A wider sweep of 32 single-defence mutants over the gateway, credential verifier, replay, audit chain/checkpoint, delegation, did:web and trust-profile code found 12 initially surviving mutants. Strengthening existing scenarios (the count stays 60) closed the real gaps: checkpoint signature / payload / stream binding (`AUDIT-009`), `previousHash` linkage (`AUDIT-005`), both delegation-depth branches (`AUTHORITY-006`), did:web kid ownership and redirect refusal (`DIDWEB-009`, `DIDWEB-006`), issuer-and-type-scoped attestation trust (`ATTEST-001`), each of the verifier's two quarantine stages independently (`STATUS-003`), and the verifier's own kid/issuer comparison, exercised with a hand-crafted JWS and a permissive resolver (`CREDENTIAL-002`). The final independent audit also showed that the two quarantine stages are not interchangeable: with no `expectedSubject` only the late stage catches a quarantined subject, and the early stage changes which reason a quarantined actor receives.
 
-Two mutants still survive and are **subsumed by other checks**, not gaps: the explicit `kid`/issuer DID comparison in the credential verifier (an unrelated kid cannot be found in the issuer's document, giving the same refusal) and the "parent has no remaining depth" branch (subsumed by the "child depth not strictly less" branch). The two redundant quarantine stages each survive removal individually because the other still denies.
+**One** mutant still survives individually and is **subsumed**, not a gap: the "parent has no remaining depth" branch in the delegation attenuation walker is covered by the "child depth is not strictly less than the parent's" branch for every schema-valid non-negative depth, so the suite cannot distinguish them by outcome (only the diagnostic constraint text differs). Product source was not changed to make any mutant killable.
 
 A mutation sweep proves these specific defences are exercised; it is not a proof of completeness.
 
@@ -54,7 +54,7 @@ A mutation sweep proves these specific defences are exercised; it is not a proof
 
 ## Verification record (this branch)
 
-Typecheck clean; 653 unit/property tests pass (51 files, including 133 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
+Typecheck clean; 658 unit/property tests pass (51 files, including 138 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
 
 ## Independent audit and its resolution
 
@@ -71,4 +71,16 @@ A fresh read-only audit (Codex GPT-6.1 Sol) of the first two commits found six a
 
 A second Codex pass over the fixes failed to complete ("selected model is at capacity", a platform error; not retried unchanged). Before failing it reported one real bug, a sparse array passing `strictEqual` without its holes being compared; that is fixed and tested. The six fixes above were verified by re-running each original negative control as a real product mutant, not by that second report. A fresh independent pass over the final diff is still worth doing.
 
-Two mutants remain subsumed rather than killed (see above), and the first Codex pass agreed they are redundant under current contracts. Codex also confirmed that no trust-consuming path relies on checkpoint comparison alone.
+The first Codex pass also agreed that no trust-consuming path relies on checkpoint comparison alone.
+
+
+## Final independent audit (read-only, against `e1fab52`)
+
+Verdict: **CHANGES REQUIRED** — two P2 findings, no P0/P1, no change to any protected path (gateway, crypto, replay, policy, audit, VC, delegation, status, DID, trust-profile, schemas, Rego, policy artifacts). Both were reproduced and fixed:
+
+| Finding | Fix |
+|---|---|
+| P2 `strictEqual` accepted malformed arrays: prototype-supplied elements, a custom `toJSON` (which serialises as different evidence), `Array` subclasses | Evidence must be plain JSON-like data: exact `Array`/`Object` prototype, own enumerable data properties only (no accessors, symbols or non-index extras), every array index an own element. Negative controls run through `judge` and the real `AUDIT-009` checker. |
+| P2 quarantine survivors were described as redundant, but removing the late stage lets a quarantined subject verify when `expectedSubject` is omitted | `STATUS-003` now reaches each verifier quarantine stage independently (plus a pre-quarantine control); both single-stage mutants are killed. The documentation no longer calls them redundant. |
+
+Follow-ups from the same audit: the stale statement that `POLICY-002` and `STATUS-004` assert no invariant was removed from `docs/submission/final-submission.md`, and the verifier's kid/issuer comparison, which the audit found redundant only under today's resolvers, is now pinned by `CREDENTIAL-002`. The audit did not certify the author-reported mutation tally, because the mutation scripts are not in the repository; the figures above come from the author's runs and from the audit's independent reproduction of the specific controls it listed. These fixes have not been re-audited by Codex.

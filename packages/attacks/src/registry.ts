@@ -60,7 +60,10 @@ export const EVIDENCE_SPEC: Record<string, EvidenceSpec> = {
   'IDENTITY-003': blockedBeforePolicy,
   'IDENTITY-004': { equals: { positiveControlAuthorized: true, executorCalls: 0 } },
   'CREDENTIAL-001': blockedBeforePolicy,
-  'CREDENTIAL-002': blockedBeforePolicy,
+  // The verifier's own kid/issuer binding is exercised with a permissive resolver whose issuer document wrongly lists the attacker's key.
+  'CREDENTIAL-002': {
+    equals: { executorCalls: 0, policyCalls: 0, permissiveResolverControl: ['ACCEPTED'], permissiveResolverForgedReasons: ['VC_ISSUER_KEY_MISMATCH'] },
+  },
   'CREDENTIAL-003': blockedBeforePolicy,
   'CREDENTIAL-004': blockedBeforePolicy,
   'CREDENTIAL-005': blockedBeforePolicy,
@@ -74,7 +77,16 @@ export const EVIDENCE_SPEC: Record<string, EvidenceSpec> = {
   'AUTHORITY-006': { equals: { walkerRejected: true, notStrictlyLessRejected: true, controlWithinBudgetChainAccepted: true } },
   'STATUS-001': blockedBeforePolicy,
   'STATUS-002': blockedBeforePolicy,
-  'STATUS-003': blockedBeforePolicy,
+  // Quarantine: the gateway denies before policy, AND each of the verifier's two quarantine stages is independently reached.
+  'STATUS-003': {
+    equals: {
+      executorCalls: 0,
+      policyCalls: 0,
+      verifierControlBeforeQuarantine: ['ACCEPTED'],
+      verifiedSubjectStageReasons: ['AGENT_QUARANTINED'],
+      earlyActorStageReasons: ['AGENT_QUARANTINED'],
+    },
+  },
   'STATUS-004': stoppedAtCredentialStage,
   'STATUS-005': stoppedAtCredentialStage,
   'STATUS-006': stoppedAtCredentialStage,
