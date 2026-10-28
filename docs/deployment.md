@@ -90,7 +90,7 @@ the account's workspace, serving https://agent-trust.onrender.com with real did:
 deployed manually on 2026-09-15 from the **pre-audit** commit `4c25b4b` and passed `smoke:live` 45/45 on 2026-10-28.
 
 Because that build had a confirmed audit-chain-poisoning flaw, the service was **suspended** and its auto-deploy turned **off** on
-2026-10-28. The fix is merged to `main` as `e4ba7eb` (PR #1, CI green). Redeploying the exact merged commit and re-verifying it
+2026-10-28. The fix was merged by PR #1 (merge commit `e4ba7eb`, CI green). Redeploying the exact merged commit and re-verifying it
 (health SHA, `identityMode=web`, `replayStore=redis`, `smoke:live` 45/45, presets, audit chain) is the remaining step; whether Render
 accepts a deploy while a service is suspended is not documented, so the first attempt may require resuming it.
 

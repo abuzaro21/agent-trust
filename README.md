@@ -1,20 +1,60 @@
 # Agent Trust
 
-**A Trust & Authorization Fabric for AI agents — verifiable identity, scoped delegation, revocable authority, and deterministic policy enforcement.**
+## Trust is a grant, not a score.
 
-> **Trust is a grant, not a score — verifiable, scoped, revocable authority.**
+**A trust & authorization fabric for AI agents.** An agent may act only as far as it was *verifiably* authorized: a DID-proven identity, signed W3C credentials, scoped and revocable delegation, replay protection and a deterministic policy decide every request — never reputation, history or the UI. Every decision leaves a tamper-evident, hash-chained receipt.
 
-## Live Demo
+> **Live demo (required deliverable):** https://agent-trust.onrender.com
+> **Status (2026-10-28): the public service is suspended** while the merged security fixes are redeployed and re-verified (`smoke:live`, presets, audit chain). Until it is back, run the demo locally with the quickstart below. Current status of the public URL is tracked in [docs/submission/final-submission.md](docs/submission/final-submission.md).
+> **The refund executor is a simulation — no money moves.**
 
-> **Live demo URL (required): https://agent-trust.onrender.com** — The security fixes are merged: `main` is `e4ba7eb` (PR #1, merge commit, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
-> The interactive demo also runs from one command (see Quickstart; local **fixture** identities — real `did:web` identities need the live overlay and secrets in [docs/deployment.md](docs/deployment.md)).
-> Screenshots below are regenerated from the current UI (`pnpm shots:live`).
+### Quickstart (local, ~3 minutes on first build)
+
+```bash
+git clone https://github.com/abuzaro21/agent-trust
+cd agent-trust
+docker compose -f docker-compose.demo.yml up --build
+# → http://localhost:3000   (Redis-backed replay; no OPA install needed —
+#   the policy engine runs from the committed, hash-pinned Wasm artifact)
+```
+
+Prerequisites: Docker with Compose v2, internet access to pull base images, and a free host port 3000 (edit the `ports:` line in `docker-compose.demo.yml` otherwise). No secrets are needed: the local demo runs in **fixture mode** (bundled `did:web` fixtures). Real `did:web` identities need the live overlay in [docs/deployment.md](docs/deployment.md).
+
+### See it in four screenshots
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/01-hero-light.png"><img src="docs/screenshots/01-hero-light.png" alt="The decision stage: AcmeOrg grants SupportAgent up to 500 SAR; two request buttons; no decision until a request has run"></a><br><sub><b>One stage.</b> AcmeOrg ▶ "may refund up to 500 SAR" ▶ SupportAgent (limit read from the backend's signed profile). The verdict stays empty until a request has really run.</sub></td>
+    <td width="50%"><a href="docs/screenshots/02-allow-120-light.png"><img src="docs/screenshots/02-allow-120-light.png" alt="120 SAR authorized: Allowed by policy, execution succeeded (simulated)"></a><br><sub><b>120 SAR → authorized.</b> Authorization (policy) and Execution (<i>simulated</i>) are two separate rows, straight from the backend <code>GatewayResult</code>.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/04-comparison-light.png"><img src="docs/screenshots/04-comparison-light.png" alt="5,000 SAR denied with AUTHORITY_LIMIT_EXCEEDED and the side-by-side comparison with 120 SAR"></a><br><sub><b>5,000 SAR → denied, then compared.</b> <code>AUTHORITY_LIMIT_EXCEEDED</code>; the side-by-side view is built only from the two real responses.</sub></td>
+    <td width="50%"><a href="docs/screenshots/06-failure-cases-light.png"><img src="docs/screenshots/06-failure-cases-light.png" alt="Spoofed agent, revoked credential and replayed request all denied"></a><br><sub><b>Failure thinking.</b> Spoofed agent (<code>IDENTITY_PROOF_INVALID</code>), revoked credential, replay — each a real request through the same gateway. Suite evidence: <a href="docs/screenshots/17-security-tests.png">60/60 security scenarios</a>.</sub></td>
+  </tr>
+</table>
+
+> **Where these images come from:** they were captured by clicking the real buttons against a **local** backend in fixture mode (`pnpm shots:live`) — nothing is mocked or composited. They are **not** evidence of the public deployment; there is no public-deployment capture until the service has been redeployed and verified.
+
+<details>
+<summary>More screenshots (desktop, tablet, mobile; light and dark)</summary>
+
+- **Desktop, light:** [5,000 SAR denied](docs/screenshots/03-deny-5000-light.png) · [how it was decided (8 gateway steps)](docs/screenshots/05-pipeline-light.png) · [grant · scope · revoke](docs/screenshots/07-grant-scope-revoke-light.png) · [evidence and audit history](docs/screenshots/08-evidence-light.png) · [security tests page](docs/screenshots/17-security-tests.png)
+- **Desktop, dark:** [decision stage](docs/screenshots/09-hero-dark.png) · [comparison](docs/screenshots/10-comparison-dark.png)
+- **Tablet:** [comparison](docs/screenshots/16-tablet-comparison-light.png)
+- **Mobile (light):** [stage](docs/screenshots/11-mobile-hero-light.png) · [120 SAR authorized](docs/screenshots/12-mobile-allow-light.png) · [5,000 SAR denied](docs/screenshots/13-mobile-deny-light.png) · [comparison](docs/screenshots/14-mobile-comparison-light.png)
+- **Mobile (dark):** [5,000 SAR denied](docs/screenshots/15-mobile-deny-dark.png)
+
+</details>
+
+### For judges
+
+[Submission package](docs/submission/final-submission.md) (form data, thesis, status) · [Judge checklist](docs/submission/judge-checklist.md) (requirement → evidence) · [Two-year thesis](docs/submission/two-year-thesis.md) · [AI tools & decisions](docs/submission/ai-tools-and-decisions.md) · [Out of scope](docs/submission/out-of-scope.md) · [90-second walkthrough script](docs/submission/loom-script.md) (video optional, not yet recorded) · [Threat model](docs/threat-model.md)
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
 | | Request | Result |
 |---|---|---|
-| | refund **120 SAR** | **ALLOW** → executed → audit receipt |
+| | refund **120 SAR** | **ALLOW** → executed (simulated) → audit receipt |
 | | refund **5000 SAR** | **DENY** `AUTHORITY_LIMIT_EXCEEDED` — exceeds the delegated cap of 500 SAR |
 | | spoofed identity | **DENY** `IDENTITY_PROOF_INVALID` — signed with a foreign key |
 | | revoked credential | **DENY** `CREDENTIAL_REVOKED` — current status kills authority |
@@ -22,6 +62,13 @@
 
 The second row is the thesis: the agent was not "less trusted" — the *action*
 left the scope of its authority. Deterministic policy, not reputation, decides.
+
+**60/60 adversarial security scenarios pass** at image build time (see the
+[Security Tests view](docs/screenshots/17-security-tests.png)): identity
+spoofing, tampered proofs, audience confusion, delegation widening, revocation
+bypass, replay, provider outages, DID-transport abuse — each judged not only on
+the denial reason but on side-effect invariants (the executor really did not
+run; the victim really was not attributed).
 
 ### What this demo is — and is not
 
@@ -38,36 +85,7 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
 - **The gateway accepts a single delegation link.** Multi-hop chains are verified and attenuated
   in `packages/delegation` (tested directly) but are not presentable through the gateway in P0.
 
-**60/60 adversarial security scenarios pass** at image build time (see the
-[Security Tests view](docs/screenshots/17-security-tests.png)): identity
-spoofing, tampered proofs, audience confusion, delegation widening, revocation
-bypass, replay, provider outages, DID-transport abuse — each judged not only on
-the denial reason but on side-effect invariants (the executor really did not
-run; the victim really was not attributed).
-
-One screen, one decision. Every state below was produced by clicking the real buttons against a real local backend (`pnpm shots:live`); nothing is mocked or composited.
-
-| | |
-|---|---|
-| ![Decision stage, light](docs/screenshots/01-hero-light.png) ![Decision stage, dark](docs/screenshots/09-hero-dark.png) | **Trust is a grant, not a score.** AcmeOrg grants SupportAgent authority to refund up to **500 SAR** (read from the backend's signed profile). Two request buttons; the verdict area stays empty ("No decision yet") until a request has really run. Light by default, dark on request. |
-| ![120 SAR authorized](docs/screenshots/02-allow-120-light.png) ![5,000 SAR denied](docs/screenshots/03-deny-5000-light.png) | Verdict, reason code and amount-vs-limit come from the backend `GatewayResult`. **Authorization** (the policy decision) and **Execution (simulated)** are shown as two separate rows; the browser decides nothing. |
-| ![Side-by-side comparison, light](docs/screenshots/04-comparison-light.png) ![Side-by-side comparison, dark](docs/screenshots/10-comparison-dark.png) | After both requests have returned, a comparison built only from those two responses — *same agent, same credential, different amount, different decision* (it says "same outcome" instead if the backend ever returns the same outcome twice). |
-| ![How it was decided](docs/screenshots/05-pipeline-light.png) | "How it was decided": eight steps in the real gateway order — identity → replay claim → credentials & status → delegation chain verified → **policy** → decision receipt → execution (simulated) → outcome receipt — behind a disclosure, with technical receipts one level deeper. |
-| ![Failure cases](docs/screenshots/06-failure-cases-light.png) ![Grant, scope, revoke](docs/screenshots/07-grant-scope-revoke-light.png) | Spoofed agent, revoked credential and replay first; three more (quarantine, wrong audience, tampered request) behind a disclosure. A compact Grant · Scope · Revoke explanation, each step tied to something runnable or a suite scenario. |
-| ![Evidence](docs/screenshots/08-evidence-light.png) ![Security tests](docs/screenshots/17-security-tests.png) | The 60-scenario suite summary, a signed hash-chained audit history (own signer, **not** externally anchored), attestations ("evidence, never authority") and runtime facts, each behind a disclosure. |
-| ![Mobile hero](docs/screenshots/11-mobile-hero-light.png) ![Mobile verdict](docs/screenshots/12-mobile-allow-light.png) ![Mobile comparison](docs/screenshots/14-mobile-comparison-light.png) ![Mobile dark](docs/screenshots/15-mobile-deny-dark.png) ![Tablet](docs/screenshots/16-tablet-comparison-light.png) | Responsive on phone and tablet; after a request the page scrolls the verdict into view without moving keyboard focus. |
-
 **Architecture in one line:** Identity → Claims → Verification → Authority → Policy → Provenance (full diagram in [docs/architecture.md](docs/architecture.md)).
-
-### Quickstart
-
-```bash
-git clone https://github.com/abuzaro21/agent-trust
-cd agent-trust
-docker compose -f docker-compose.demo.yml up --build
-# → http://localhost:3000   (Redis-backed replay; no OPA install needed —
-#   the policy engine runs from the committed, hash-pinned Wasm artifact)
-```
 
 ## The Problem
 

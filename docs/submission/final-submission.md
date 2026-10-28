@@ -2,12 +2,12 @@
 
 ## Status
 
-**Status (2026-10-28).** The security fixes are merged: `main` is `e4ba7eb` (PR #1, merge commit, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
+**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
 
 **Release baseline.** The original submission freeze (`c286ebd`) predates an independent audit. The post-audit repairs
 were merged by PR #1 into `main` as merge commit `e4ba7eb` (tree-identical to the tested branch head `92ff923`; CI green on
-`e4ba7eb`). The judge-facing UI redesign lives on branch `feat/agent-trust-judge-ui-20261028` and is **not merged** until
-approved. The final submitted SHA is whatever commit is tagged `builders-league-submission-v1`; the running build reports it
+`e4ba7eb`). The judge-facing single-stage UI is PR #2 (branch `feat/agent-trust-judge-ui-20261028`); check the PR for
+its merge state. The final submitted SHA is whatever commit is tagged `builders-league-submission-v1`; the running build reports it
 at `/api/health` (`RENDER_GIT_COMMIT`).
 
 **Submission requirements** (verified by the project owner from the challenge page; not independently re-fetched): public
@@ -120,7 +120,7 @@ Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at 71b3ef6; la
   browser automation 78/78 checks (`pnpm ui:check` against a local instance: layout at 4 widths, light/dark theme,
   decision stage in the first screen, comparison derived from the responses, failure cases, evidence disclosures,
   mobile scroll-into-view with focus kept, keyboard, states)
-  CI: NOT YET RUN — the branch is not pushed
+  CI: green on PR #2 (job "Typecheck + tests + Rego/Wasm + Redis integration"; see the PR checks for the exact head)
   Note: under heavy CPU contention the default parallel run has twice timed out one pre-existing 150-run property test
   (packages/status, 5 s default) that passes alone in ~2 s; it is unrelated to this branch (no package changed).
 
