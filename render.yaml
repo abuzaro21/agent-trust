@@ -1,0 +1,41 @@
+# Render Blueprint for the Agent Trust demo (DOO Builders League).
+# Free plan only. Secrets are `sync: false` (entered once in the Render dashboard
+# at Blueprint creation) — never put values in this file.
+# Single instance: demo audit/profile state is process-local (see docs/deployment.md).
+services:
+  - type: web
+    name: agent-trust-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    # Deploys are triggered explicitly by the release workflow, never by a push.
+    autoDeployTrigger: "off"
+    # Liveness only; readiness is /api/demo/status (checked by the smoke test).
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render's default PORT is 10000; the image listens on 3000, so pin it.
+      - key: PORT
+        value: "3000"
+      - key: AGENT_TRUST_REPO_ROOT
+        value: /app
+      - key: DEMO_IDENTITY_MODE
+        value: web
+      - key: DEMO_DID_DOMAIN
+        value: abuzaro21.github.io
+      # Short release SHA (set per release; see docs/deployment.md).
+      - key: DEMO_BUILD_SHA
+        sync: false
+      # rediss://… from the Redis provider (TLS). Secret.
+      - key: DEMO_REDIS_URL
+        sync: false
+      # Private JWKs from `pnpm demo:did:init` (.local/demo-keys). Secrets.
+      - key: DEMO_ORG_KEY_JSON
+        sync: false
+      - key: DEMO_SUPPORT_KEY_JSON
+        sync: false
+      - key: DEMO_REFUND_KEY_JSON
+        sync: false

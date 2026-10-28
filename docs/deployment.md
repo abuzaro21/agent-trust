@@ -197,3 +197,21 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 
 Known cosmetic caveat: the `/attacks` page badge `baseline 414cbaa` is a historical constant in `packages/attacks/src/runner.ts`
 (the commit the suite was first baselined at), **not** the build SHA — do not narrate it as the deployed commit.
+
+## Alternative host: Render free plan (planned, not deployed)
+
+`render.yaml` at the repository root is a Blueprint for the free plan (Docker runtime, single instance, `autoDeployTrigger: "off"`,
+`PORT=3000` pinned, secrets as `sync: false`). It has **not** been applied or validated against Render (`render blueprints validate`
+needs a logged-in workspace); only its YAML syntax was checked.
+
+Facts from Render's public docs (checked 2026-10-28) that affect this demo:
+
+- A Free web service **spins down after 15 minutes without traffic** and takes about one minute to start again; Render may also
+  restart it at any time. Process-local demo state (audit/profile/status) therefore resets more often than on an always-on host.
+- 750 free instance-hours per workspace per month: one always-on service fits (744 h), several do not; spun-down services use none.
+- No persistent disk; one instance only (matches the single-replica requirement).
+- Render's free Key Value is **in-memory only** (data lost on restart) and limited to one per workspace — an external Redis with
+  persistence and TLS (`rediss://`) is preferable for replay claims. The client verifies certificates: against a TLS-only Redis the
+  5 Redis integration tests pass with a trusted CA and fail closed with an untrusted one (tested locally).
+- Free-instance bandwidth/build-minute allowances were not stated on Render's pages — read them from the dashboard.
+- Whether the Free plan accepts the Docker runtime is not stated on the pages read; confirm at first deploy.
