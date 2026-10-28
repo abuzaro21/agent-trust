@@ -2,20 +2,17 @@
 
 ## Status
 
-**Public demo status (2026-10-28):** https://agent-trust.onrender.com exists (Render free plan, real did:web identities,
-Redis replay) and passed `smoke:live` 45/45, **but it runs the pre-audit build `4c25b4b`**. Remaining blockers: redeploy
-the release commit and re-verify it (`smoke:live`, presets, audit chain), then record the walkthrough against it.
+**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`, CI green). The public Render service https://agent-trust.onrender.com is **suspended** for security containment and its auto-deploy is off; it must be redeployed from the merged code and re-verified (`smoke:live` 45/45, presets, audit chain) before the demo URL is submitted. The 90-second video is optional but recommended and is not recorded yet.
 
-**Release baseline.** The original submission freeze (`c286ebd`) predates an
-independent audit. Post-audit repairs live on branch
-`fix/agent-trust-doo-p0-20261028` (code baseline `043257b`; documentation
-commits follow it). The final submitted SHA is whatever commit is tagged
-`builders-league-submission-v1` — record it with `git rev-parse --short HEAD`
-and pass it as `DEMO_BUILD_SHA`.
+**Release baseline.** The original submission freeze (`c286ebd`) predates an independent audit. The post-audit repairs
+were merged by PR #1 into `main` as merge commit `e4ba7eb` (tree-identical to the tested branch head `92ff923`; CI green on
+`e4ba7eb`). The judge-facing single-stage UI is PR #2 (branch `feat/agent-trust-judge-ui-20261028`); check the PR for
+its merge state. The final submitted SHA is whatever commit is tagged `builders-league-submission-v1`; the running build reports it
+at `/api/health` (`RENDER_GIT_COMMIT`).
 
-The remaining act is to redeploy the existing Render service from the release commit and re-verify it
-(procedure in [docs/deployment.md](../deployment.md)). The 45/45 smoke seen on 2026-10-28 was against the
-pre-audit build, so it is **not** evidence for the release commit: re-run it after the redeploy.
+**Submission requirements** (verified by the project owner from the challenge page; not independently re-fetched): public
+repository with a clean-clone working build; **a live demo URL is required**; a 90-second video is **optional but
+recommended**; AI-tools, decisions and out-of-scope notes; a two-year thesis of at most 300 words.
 
 ## Form data (copy/paste)
 
@@ -29,8 +26,8 @@ One-line description: A verifiable trust layer for AI agents combining
 
 Repo URL:            https://github.com/abuzaro21/agent-trust
 
-Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit build 4c25b4b —
-                     do NOT submit until it is redeployed from the release commit).
+Live Demo URL:       https://agent-trust.onrender.com (REQUIRED — currently suspended for security
+                     containment; do NOT submit until it is redeployed from the merged code and verified).
                      Runs from one command:
                        git clone https://github.com/abuzaro21/agent-trust
                        cd agent-trust
@@ -40,7 +37,7 @@ Live Demo URL:       https://agent-trust.onrender.com (currently the pre-audit b
                       adds real did:web identities, see docs/deployment.md.
                       The public did:web identities below resolve RIGHT NOW)
 
-Walkthrough URL:     PENDING RECORDING (script ready: loom-script.md)
+Walkthrough URL:     OPTIONAL but recommended — not recorded yet (script ready: loom-script.md)
 
 Architecture summary: Identity → Claims → Verification → Authority →
                       Policy → Provenance. Every request from an agent
@@ -106,30 +103,35 @@ https://abuzaro21.github.io/agents/refund/did.json
 Each identity has its own P-256 key; private keys live only as deployment
 secrets (never committed, never in the image, never in the browser).
 
-## Verified metrics (post-audit release branch)
+## Verified metrics (each line names the code it was run on)
 
-Executed on a clean worktree of the release branch (code baseline `043257b`),
-Windows 11, Node 24, pinned OPA 1.20.2, Redis 7 for integration. Counts below
-are from those runs; historical counts from the original freeze are not reused.
+Windows 11, Node 24, pinned OPA 1.20.2, Redis 7 for integration. Historical counts from the original freeze are not reused.
 
 ```text
-TypeScript typecheck       0 errors
-default `pnpm test`        483 passed (435 package + 48 apps/web; 473 pass + 10 skip without OPA)
-frontend/API subset        48 passed (`pnpm test:frontend`, already inside the 483)
-redis integration          5/5 (Redis 7)
-OPA native tests           13/13
-adversarial suite          60/60 (52 attacks + 8 failure demos)
-production web build       passes
-CI                         green on the original freeze; re-run on the release branch is pending
-live-mode smoke            45/45 against the CURRENT public service, which runs the pre-audit build 4c25b4b;
-                           NOT yet run against a deployment of the release commit
-docker image / compose     see docs/deployment.md "Verification record"
+Security release (92ff923, merged to main as e4ba7eb — tree-identical):
+  typecheck 0 errors · 483 tests in the default run (435 package + 48 apps/web) · Redis integration 5/5
+  OPA native 13/13 · adversarial suite 60/60 (52 attacks + 8 failure demos) · production build · Docker build
+  CI: green on the PR head and on the merge commit e4ba7eb
+  (details: docs/deployment.md "Verification record")
+
+Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at 71b3ef6; later commits are documentation only):
+  typecheck 0 errors · 520 tests in the default run (435 package + 85 apps/web; 510 pass + 10 skip without OPA)
+  Redis integration 5/5 · OPA native 13/13 · adversarial suite 60/60 · production build
+  browser automation 78/78 checks (`pnpm ui:check` against a local instance: layout at 4 widths, light/dark theme,
+  decision stage in the first screen, comparison derived from the responses, failure cases, evidence disclosures,
+  mobile scroll-into-view with focus kept, keyboard, states)
+  CI: green on PR #2 (job "Typecheck + tests + Rego/Wasm + Redis integration"; see the PR checks for the exact head)
+  Note: under heavy CPU contention the default parallel run has twice timed out one pre-existing 150-run property test
+  (packages/status, 5 s default) that passes alone in ~2 s; it is unrelated to this branch (no package changed).
+
+Public service (https://agent-trust.onrender.com):
+  SUSPENDED for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b).
+  smoke:live was 45/45 against that old build on 2026-10-28; it has NOT been run against a deployment of the merged code.
 ```
 
-Independent review: a read-only audit by a second model family (Codex
-GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass challenged its
-findings, and the same reviewer re-reviewed the five repair commits (no
-production defects found; one test weakness fixed).
+Independent review: a read-only audit by a second model family (Codex GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass
+challenged its findings, and Codex re-reviewed the repair commits and, separately, the UI redesign (9 verified defects fixed, then a
+re-review whose remaining findings were also fixed). The single-stage redesign then got its own independent read-only review after the last UI change: 3 verified defects (authorization misreported for an audit veto, comparison could call different outcomes identical, two browser checks that could pass vacuously) were fixed with regression tests.
 
 ## Files in this package
 

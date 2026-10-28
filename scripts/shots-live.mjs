@@ -1,79 +1,125 @@
 #!/usr/bin/env node
 /**
- * pnpm shots:live — STEP 16AD screenshot capture.
+ * pnpm shots:live — screenshot capture of the REAL running UI.
  *
- *   DEMO_PUBLIC_URL=http://localhost:3000 pnpm shots:live
+ *   UI_URL=http://localhost:3300 pnpm shots:live
  *
- * Drives the real UI (Chrome via puppeteer-core, 1440x900) through the
- * judge flow and writes docs/screenshots/0N-*.png. No secrets ever render.
+ * Drives Chrome (puppeteer-core) through the judge flow at 1440x900 (light and
+ * dark) plus 390x844 mobile (light and dark) and writes docs/screenshots/*.png.
+ * Every state is produced by clicking the real buttons against the real
+ * backend; nothing is composited or edited. Run it against a LOCAL or freshly
+ * deployed instance of the release you are documenting — screenshots must
+ * match the deployed commit.
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import puppeteer from 'puppeteer-core';
 
-const base = (process.env.DEMO_PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+if (!process.env.UI_URL) {
+  console.error('UI_URL is required (e.g. UI_URL=http://localhost:3300).');
+  process.exit(2);
+}
+const base = process.env.UI_URL.replace(/\/$/, '');
 const OUT = join(import.meta.dirname, '..', 'docs', 'screenshots');
 mkdirSync(OUT, { recursive: true });
+for (const f of readdirSync(OUT)) if (f.endsWith('.png')) rmSync(join(OUT, f)); // regenerate the whole set so no stale image survives
+const CHROME = process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
-const CHROME =
-  process.env.CHROME_PATH ??
-  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--hide-scrollbars'] });
 
-const browser = await puppeteer.launch({
-  executablePath: CHROME,
-  headless: 'new',
-  args: ['--window-size=1440,900', '--hide-scrollbars'],
-});
-const page = await browser.newPage();
-await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
-
-async function shot(name, waitSel, fn) {
-  if (fn) await fn();
-  if (waitSel) await page.waitForSelector(waitSel, { timeout: 25_000 });
-  await new Promise((r) => setTimeout(r, 900)); // let fonts/animations settle
+async function session(width, height, theme, fn) {
+  const page = await browser.newPage();
+  await page.setViewport({ width, height, deviceScaleFactor: 1, isMobile: width < 500, hasTouch: width < 500 });
+  await page.evaluateOnNewDocument((t) => { try { localStorage.setItem('at-theme', t); } catch {} }, theme);
+  await page.goto(base + '/', { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => /may refund up to/.test(document.body.innerText), { timeout: 30000 });
+  await fn(page);
+  await page.close();
+}
+const settle = (ms = 900) => new Promise((r) => setTimeout(r, ms));
+async function click(page, source) {
+  const h = await page.evaluateHandle((s) => [...document.querySelectorAll('button')].find((b) => new RegExp(s, 'i').test(b.innerText.trim())) ?? null, source);
+  await h.asElement().click();
+}
+const waitFor = (page, re) => page.waitForFunction((s) => new RegExp(s).test(document.getElementById('verdict-anchor')?.innerText ?? ''), { timeout: 30000 }, re);
+const scrollTo = (page, sel, block = 'start') => page.evaluate((s, b) => { document.querySelector(s)?.scrollIntoView({ block: b, behavior: 'instant' }); }, sel, block);
+async function shoot(page, name) {
+  await settle();
   await page.screenshot({ path: join(OUT, name) });
   console.log('wrote', name);
 }
+const cardRun = async (page, id, re) => {
+  const b = await page.evaluateHandle((i) => document.querySelector(`#f-${i}`)?.closest('article')?.querySelector('button') ?? null, id);
+  await b.asElement().click();
+  await page.waitForFunction((i, s) => new RegExp(s).test(document.querySelector(`#f-${i}`)?.closest('article')?.innerText ?? ''), { timeout: 30000 }, id, re);
+};
 
-// 01 — Trust Profile (live did:web identity visible)
-await page.goto(base + '/', { waitUntil: 'networkidle2' });
-await shot('01-trust-profile.png', 'main');
-
-// 02 — 120 SAR ALLOW
-await shot('02-allow-120.png', null, async () => {
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Valid 120 SAR'));
-    btn?.click();
-  });
-  await page.waitForFunction(
-    () => document.body.innerText.includes('AUTHORIZED') && document.body.innerText.includes('SUCCEEDED'),
-    { timeout: 30_000 },
-  );
+await session(1440, 900, 'light', async (page) => {
+  await shoot(page, '01-hero-light.png');
+  await click(page, '^120 sar');
+  await waitFor(page, 'Authorized');
+  await shoot(page, '02-allow-120-light.png');
+  await click(page, '^5,000 sar');
+  await waitFor(page, 'Denied');
+  await shoot(page, '03-deny-5000-light.png');
+  await scrollTo(page, '.compare-wrap', 'center');
+  await shoot(page, '04-comparison-light.png');
+  await scrollTo(page, '#demo-title');
+  await page.evaluate(() => document.querySelector('.verdict-more > details > summary')?.click());
+  await scrollTo(page, '.verdict-more', 'center');
+  await shoot(page, '05-pipeline-light.png');
+  await scrollTo(page, '#failures');
+  await cardRun(page, 'spoof', 'IDENTITY_PROOF_INVALID');
+  await cardRun(page, 'revoked', 'CREDENTIAL_REVOKED');
+  await cardRun(page, 'replay', 'REPLAY_DETECTED');
+  await scrollTo(page, '#failures');
+  await shoot(page, '06-failure-cases-light.png');
+  await scrollTo(page, '#lifecycle');
+  await shoot(page, '07-grant-scope-revoke-light.png');
+  await page.evaluate(() => document.querySelector('#audit-acc > summary')?.click());
+  await scrollTo(page, '#evidence');
+  await shoot(page, '08-evidence-light.png');
 });
 
-// 03 — 5000 SAR DENY
-await shot('03-deny-5000.png', null, async () => {
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Over-limit 5000 SAR'));
-    btn?.click();
-  });
-  await page.waitForFunction(() => document.body.innerText.includes('AUTHORITY_LIMIT_EXCEEDED'), { timeout: 30_000 });
+await session(1440, 900, 'dark', async (page) => {
+  await shoot(page, '09-hero-dark.png');
+  await click(page, '^run both');
+  await page.waitForFunction(() => document.querySelector('.compare'), { timeout: 30000 });
+  await scrollTo(page, '#demo', 'start');
+  await page.evaluate(() => window.scrollBy(0, 150));
+  await shoot(page, '10-comparison-dark.png');
 });
 
-// 04 — Spoofed agent
-await shot('04-spoof-denied.png', null, async () => {
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Spoofed Agent'));
-    btn?.click();
-  });
-  await page.waitForFunction(() => document.body.innerText.includes('IDENTITY_PROOF_INVALID'), { timeout: 30_000 });
+await session(390, 844, 'light', async (page) => {
+  await shoot(page, '11-mobile-hero-light.png');
+  await click(page, '^120 sar');
+  await waitFor(page, 'Authorized');
+  await shoot(page, '12-mobile-allow-light.png'); // the page scrolled the verdict into view by itself
+  await click(page, '^5,000 sar');
+  await waitFor(page, 'Denied');
+  await shoot(page, '13-mobile-deny-light.png');
+  await scrollTo(page, '.compare-wrap');
+  await shoot(page, '14-mobile-comparison-light.png');
 });
 
-// 05 — Security tests 60/60
-await shot('05-security-tests.png', null, async () => {
-  await page.goto(base + '/attacks', { waitUntil: 'networkidle2' });
+await session(390, 844, 'dark', async (page) => {
+  await click(page, '^5,000 sar');
+  await waitFor(page, 'Denied');
+  await shoot(page, '15-mobile-deny-dark.png');
 });
 
+await session(768, 1024, 'light', async (page) => {
+  await click(page, '^run both');
+  await page.waitForFunction(() => document.querySelector('.compare'), { timeout: 30000 });
+  await scrollTo(page, '#demo');
+  await shoot(page, '16-tablet-comparison-light.png');
+});
+
+const page = await browser.newPage();
+await page.setViewport({ width: 1440, height: 900 });
+await page.goto(base + '/attacks', { waitUntil: 'networkidle0' });
+await page.waitForFunction(() => /scenarios passed/.test(document.body.innerText), { timeout: 30000 });
+await shoot(page, '17-security-tests.png');
 await browser.close();
 console.log('screenshots complete →', OUT);

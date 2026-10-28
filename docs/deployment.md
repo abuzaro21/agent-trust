@@ -85,12 +85,14 @@ leak scans of API responses + HTML + JS bundles.
 
 ## Public status (2026-10-28)
 
-A Render **free** web service `agent-trust` (Docker, Frankfurt, one instance) and a free Render Key Value `agent-trust-redis`
-already exist in the account's workspace, serving https://agent-trust.onrender.com with real did:web identities and
-Redis-backed replay. It was last deployed manually on 2026-09-15 from commit `4c25b4b` — the **pre-audit build** — and passed
-`smoke:live` 45/45 on 2026-10-28. Its auto-deploy is currently **on for `main`**, so merging the release branch to `main`
-would redeploy it automatically; turn auto-deploy off first (`render services update agent-trust --auto-deploy=false` — verify
-the flag semantics) so the release commit is deployed deliberately and verified.
+A Render **free** web service `agent-trust` (Docker, Frankfurt, one instance) and a free Render Key Value `agent-trust-redis` exist in
+the account's workspace, serving https://agent-trust.onrender.com with real did:web identities and Redis-backed replay. It was last
+deployed manually on 2026-09-15 from the **pre-audit** commit `4c25b4b` and passed `smoke:live` 45/45 on 2026-10-28.
+
+Because that build had a confirmed audit-chain-poisoning flaw, the service was **suspended** and its auto-deploy turned **off** on
+2026-10-28. The fix was merged by PR #1 (merge commit `e4ba7eb`, CI green). Redeploying the exact merged commit and re-verifying it
+(health SHA, `identityMode=web`, `replayStore=redis`, `smoke:live` 45/45, presets, audit chain) is the remaining step; whether Render
+accepts a deploy while a service is suspended is not documented, so the first attempt may require resuming it.
 
 ## Abuse scope (16S/16W/16V)
 
@@ -176,8 +178,9 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Default `pnpm test` (OPA on PATH) | PASS — 483/483 in 47 files (435 package tests + the 48 `apps/web` tests); without OPA: 473 pass + 10 skipped |
-| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 48/48 (6 files) |
+| Default `pnpm test` (OPA on PATH; judge-UI code at `71b3ef6`) | PASS — 520/520 in 47 files (435 package tests + the 85 `apps/web` tests); without OPA: 510 pass + 10 skipped. Under heavy CPU contention one pre-existing property test (`packages/status`, 5 s timeout) has intermittently timed out in the parallel run and passes alone |
+| `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 85/85 (6 files) |
+| `pnpm ui:check` (browser automation of the single-stage UI, local instance) | PASS — 78/78 (layout at 4 widths, light/dark theme, empty state before any request, ALLOW/DENY, authorization vs execution, response-derived comparison, failure cases, evidence disclosures, mobile scroll-into-view with focus kept, loading/error/retry/validation, reduced motion) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
 | OPA fmt / check / test | PASS — 13/13 |
 | Adversarial suite | PASS — 60/60 (52 attacks + 8 failure demos) |

@@ -1,7 +1,8 @@
 # Video Production Brief (handoff — not yet executed)
 
 Status: **planning only.** Nothing here has been recorded or rendered. Execution
-is gated on a validated public demo (see "Preconditions").
+is gated on a validated public demo (see "Preconditions"). The challenge lists the
+90-second video as **optional but recommended**; the live demo URL is the required deliverable.
 
 Two deliverables, produced by one pipeline:
 
@@ -67,13 +68,13 @@ asserts the expected reason code in the DOM after each click and aborts if it di
 
 | Time | Real action | DOM/API assertion before moving on | On-screen text (caption) |
 |---|---|---|---|
-| 0:00–0:08 | Open `/`; hold on Trust Profile | Profile shows DID `…agents:support`, "no score" statement | "Who an agent is ≠ what it may do" |
-| 0:08–0:18 | Highlight boxes (DOM-placed, disclosed overlay) step through DID, `≤ 500 SAR`, attestations | Authority box shows `≤ 500 SAR` | "Evidence, not a score" |
-| 0:18–0:35 | Click **Valid 120 SAR** | outcome AUTHORIZED, effect ALLOW, execution SUCCEEDED | "120 SAR → ALLOW (simulated refund)" |
-| 0:35–0:50 | Click **Over-limit 5000 SAR** | `AUTHORITY_LIMIT_EXCEEDED`, execution NOT_RUN | "5000 SAR → DENY: trusted, not for this action" |
-| 0:50–1:00 | Click **Spoofed Agent** | `IDENTITY_PROOF_INVALID`, policy NOT_RUN | "Spoof → DENY" |
-| 1:00–1:10 | Click **Revoked Credential** | `CREDENTIAL_REVOKED` | "Revoked → DENY" |
-| 1:10–1:18 | Click **Replay Attack** | first AUTHORIZED, second `REPLAY_DETECTED` | "Replay → DENY" |
+| 0:00–0:08 | Open `/`; hold on the hero and the stage | h1 "Trust is a grant, not a score."; grant strip shows `may refund up to 500 SAR` | "Who an agent is ≠ what it may do" |
+| 0:08–0:18 | Highlight boxes (DOM-placed, disclosed overlay) step through AcmeOrg, the `≤ 500 SAR` grant, SupportAgent "✓ DID resolved"; open and close "Credential and identity details" | grant strip + details disclosure | "Evidence, not a score" |
+| 0:18–0:35 | Click **120 SAR** | verdict "Authorized" + `WITHIN_AUTHORITY`; rows "Authorization: Allowed by policy" / "Execution: Succeeded (simulated)"; in "How it was decided" step 7 = `SUCCEEDED (simulated)`, step 8 = `RECORDED` | "120 SAR → ALLOW (simulated refund)" |
+| 0:35–0:50 | Click **5,000 SAR** | verdict "Denied" + `AUTHORITY_LIMIT_EXCEEDED`; "Authorization: Denied by policy", "Execution: Not run"; then the side-by-side comparison (✓ 120 / ✕ 5,000) appears | "5,000 SAR → DENY: trusted, not for this action" |
+| 0:50–1:00 | *Failure cases* → **Spoofed agent** → Run this case | card shows `IDENTITY_PROOF_INVALID`; pipeline: step 1 DENY, rest — | "Spoof → DENY" |
+| 1:00–1:10 | **Revoked credential** → Run this case | card shows `CREDENTIAL_REVOKED` | "Revoked → DENY" |
+| 1:10–1:18 | **Replayed request** → Run this case | "First send: AUTHORIZED · identical re-send: DENIED"; `REPLAY_DETECTED` | "Replay → DENY" |
 | 1:18–1:30 | Navigate to `/attacks`; hold on banner (52 attacks + 8 failure demos); back to `/` | banner reads 60/60 | "60 security scenarios" · repo URL |
 
 ## Claims that may be narrated (and their evidence)
@@ -108,7 +109,7 @@ asserts the expected reason code in the DOM after each click and aborts if it di
 | FFmpeg | 9.0.2 present |
 | Chrome | present at `C:\Program Files\Google\Chrome\Application\chrome.exe` |
 | puppeteer-core | present (dev dependency) |
-| Existing screenshots | 5 PNGs at 1440×900 in `docs/screenshots/` — predate the post-audit build; recapture, do not reuse as evidence |
+| Existing screenshots | 17 PNGs in `docs/screenshots/` (desktop light and dark, tablet, mobile light and dark) regenerated from the current UI with real clicks against a local backend (`pnpm shots:live`). Reusable as README imagery; for the video, capture fresh footage from the deployed demo, do not reuse stills as evidence |
 | Prior TOTEX video workflow | not inspected (project rules forbid touching TOTEX during this work); user to point to a copy if wanted |
 | Brag on Haiku | not automatic — Brag runs on whatever model the session uses; Opus 5.5 auto-switches to `brag-slim`. Run the session/delegate on Haiku 5.5 and verify the serving model from runtime metadata |
 

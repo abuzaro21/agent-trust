@@ -2,38 +2,42 @@
 
 The whole system is one authorized path plus one honest read model. Every
 arrow below is implemented, tested, and visible in the live dashboard —
-the browser only renders what the backend already decided.
+the browser only renders what the backend already decided. Where the target design is
+broader than what was built, [architecture.md](architecture.md) says so.
 
 ```text
  Agent A (proposes a task, signed)
    │
    ▼
- Identity / proof-of-possession      ← did:web (real HTTPS documents) + ES256
+ 1 Identity / proof-of-possession    ← did:web (HTTPS documents) + ES256
    ▼
- VC / Claims                          ← W3C Verifiable Credentials (JWS)
+ 2 Replay claim                       ← atomic CLAIM-ONCE (Redis SET NX PX)
    ▼
- Status / Delegation                  ← Bitstring revocation · quarantine ·
-   │                                    Authority(child) ⊆ Authority(parent)
+ 3 Credentials + status               ← W3C VCs (JWS) · issuer trust ·
+   │                                    Bitstring revocation · quarantine
    ▼
- Replay                               ← atomic CLAIM-ONCE (Redis SET NX PX)
+ 4 Delegation chain                   ← Authority(child) ⊆ Authority(parent)
+   │                                    (the gateway accepts one link in P0)
    ▼
- VerifiedFacts                         ← only cryptographically established
-   │                                    facts may cross this line
+ VerifiedFacts                         ← only verified facts may cross this line
    ▼
- OPA Wasm Policy                       ← deterministic ALLOW / DENY + reasons
+ 5 OPA Wasm policy                     ← deterministic ALLOW / DENY + reason;
+   │                                    enforces action, resource, audience,
+   │                                    amount and time limits
    ▼
- ALLOW / DENY
+ 6 Decision receipt                    ← hash-chained, signed checkpoint
    ▼
- Audit Receipt                         ← hash-chained, signed checkpoints
+ 7 Executor (simulation in the demo)
    ▼
- Executor (simulation in the demo)
-   ▼
- Outcome Receipt / Checkpoint
+ 8 Outcome receipt
 
 
  Trust Profile  ←  authority + attestations + verified history
                    (evidence — it NEVER grants authority and never scores)
 ```
+
+The UI renders exactly these eight steps (under "How it was decided" on the decision stage), in this order, from the
+backend's own result — it never reorders or infers them.
 
 Three properties carry the entire argument:
 

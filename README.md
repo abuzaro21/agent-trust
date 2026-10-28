@@ -1,23 +1,60 @@
 # Agent Trust
 
-**A Trust & Authorization Fabric for AI agents — verifiable identity, scoped delegation, revocable authority, and deterministic policy enforcement.**
+## Trust is a grant, not a score.
 
-> **Trust is not a score. It is verifiable, scoped, revocable authority.**
+**A trust & authorization fabric for AI agents.** An agent may act only as far as it was *verifiably* authorized: a DID-proven identity, signed W3C credentials, scoped and revocable delegation, replay protection and a deterministic policy decide every request — never reputation, history or the UI. Audit-before-execution: a decision that reaches policy is written to a tamper-evident, hash-chained log *before* anything runs, and nothing executes without that receipt. Requests rejected earlier (a spoofed identity, a replay, a credential problem) or hit by an infrastructure failure are denied without a decision receipt — by design, so nobody can write entries under someone else's name.
 
-## Live Demo
+> **Live demo (required deliverable):** https://agent-trust.onrender.com
+> **Status (2026-10-28): the public service is suspended** while the merged security fixes are redeployed and re-verified (`smoke:live`, presets, audit chain). Until it is back, run the demo locally with the quickstart below. Current status of the public URL is tracked in [docs/submission/final-submission.md](docs/submission/final-submission.md).
+> **The refund executor is a simulation — no money moves.**
 
-> **Walkthrough: recording pending** (script timed and ready:
-> [docs/submission/loom-script.md](docs/submission/loom-script.md)).
-> The interactive demo (full gateway + Redis-backed replay; the Quickstart runs it
-> with local **fixture** identities — real `did:web` identities need the live overlay
-> and secrets described in [docs/deployment.md](docs/deployment.md)) runs from one command. 
-> A public Render deployment exists at https://agent-trust.onrender.com, but as of 2026-10-28 it runs the **pre-audit build `4c25b4b`** (it still has the audit-chain-poisoning flaw fixed on the release branch). It passed the 45-check live smoke suite (45/45, observed 2026-10-28) and must be redeployed from the release commit and re-verified before it is submitted. The screenshots below come from an earlier rehearsal.
+### Quickstart (local, ~3 minutes on first build)
+
+```bash
+git clone https://github.com/abuzaro21/agent-trust
+cd agent-trust
+docker compose -f docker-compose.demo.yml up --build
+# → http://localhost:3000   (Redis-backed replay; no OPA install needed —
+#   the policy engine runs from the committed, hash-pinned Wasm artifact)
+```
+
+Prerequisites: Docker with Compose v2, internet access to pull base images, and a free host port 3000 (edit the `ports:` line in `docker-compose.demo.yml` otherwise). No secrets are needed: the local demo runs in **fixture mode** (bundled `did:web` fixtures). Real `did:web` identities need the live overlay in [docs/deployment.md](docs/deployment.md).
+
+### See it in four screenshots
+
+<table>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/01-hero-light.png"><img src="docs/screenshots/01-hero-light.png" alt="The decision stage: AcmeOrg grants SupportAgent up to 500 SAR; two request buttons; no decision until a request has run"></a><br><sub><b>One stage.</b> AcmeOrg ▶ "may refund up to 500 SAR" ▶ SupportAgent (limit read from the backend's signed profile). The verdict stays empty until a request has really run.</sub></td>
+    <td width="50%"><a href="docs/screenshots/02-allow-120-light.png"><img src="docs/screenshots/02-allow-120-light.png" alt="120 SAR authorized: Allowed by policy, execution succeeded (simulated)"></a><br><sub><b>120 SAR → authorized.</b> Authorization (policy) and Execution (<i>simulated</i>) are two separate rows, straight from the backend <code>GatewayResult</code>.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/04-comparison-light.png"><img src="docs/screenshots/04-comparison-light.png" alt="5,000 SAR denied with AUTHORITY_LIMIT_EXCEEDED and the side-by-side comparison with 120 SAR"></a><br><sub><b>5,000 SAR → denied, then compared.</b> <code>AUTHORITY_LIMIT_EXCEEDED</code>; the side-by-side view is built only from the two real responses.</sub></td>
+    <td width="50%"><a href="docs/screenshots/06-failure-cases-light.png"><img src="docs/screenshots/06-failure-cases-light.png" alt="Spoofed agent, revoked credential and replayed request all denied"></a><br><sub><b>Failure thinking.</b> Spoofed agent (<code>IDENTITY_PROOF_INVALID</code>), revoked credential, replay — each a real request through the same gateway. Suite evidence: <a href="docs/screenshots/17-security-tests.png">60/60 security scenarios</a>.</sub></td>
+  </tr>
+</table>
+
+> **Where these images come from:** they were captured by clicking the real buttons against a **local** backend in fixture mode (`pnpm shots:live`) — nothing is mocked or composited. They are **not** evidence of the public deployment; there is no public-deployment capture until the service has been redeployed and verified.
+
+<details>
+<summary>More screenshots (desktop, tablet, mobile; light and dark)</summary>
+
+- **Desktop, light:** [5,000 SAR denied](docs/screenshots/03-deny-5000-light.png) · [how it was decided (8 gateway steps)](docs/screenshots/05-pipeline-light.png) · [grant · scope · revoke](docs/screenshots/07-grant-scope-revoke-light.png) · [evidence and audit history](docs/screenshots/08-evidence-light.png) · [security tests page](docs/screenshots/17-security-tests.png)
+- **Desktop, dark:** [decision stage](docs/screenshots/09-hero-dark.png) · [comparison](docs/screenshots/10-comparison-dark.png)
+- **Tablet:** [comparison](docs/screenshots/16-tablet-comparison-light.png)
+- **Mobile (light):** [stage](docs/screenshots/11-mobile-hero-light.png) · [120 SAR authorized](docs/screenshots/12-mobile-allow-light.png) · [5,000 SAR denied](docs/screenshots/13-mobile-deny-light.png) · [comparison](docs/screenshots/14-mobile-comparison-light.png)
+- **Mobile (dark):** [5,000 SAR denied](docs/screenshots/15-mobile-deny-dark.png)
+
+</details>
+
+### For judges
+
+[Submission package](docs/submission/final-submission.md) (form data, thesis, status) · [Judge checklist](docs/submission/judge-checklist.md) (requirement → evidence) · [Two-year thesis](docs/submission/two-year-thesis.md) · [AI tools & decisions](docs/submission/ai-tools-and-decisions.md) · [Out of scope](docs/submission/out-of-scope.md) · [90-second walkthrough script](docs/submission/loom-script.md) (video optional, not yet recorded) · [Threat model](docs/threat-model.md)
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
 | | Request | Result |
 |---|---|---|
-| | refund **120 SAR** | **ALLOW** → executed → audit receipt |
+| | refund **120 SAR** | **ALLOW** → executed (simulated) → audit receipt |
 | | refund **5000 SAR** | **DENY** `AUTHORITY_LIMIT_EXCEEDED` — exceeds the delegated cap of 500 SAR |
 | | spoofed identity | **DENY** `IDENTITY_PROOF_INVALID` — signed with a foreign key |
 | | revoked credential | **DENY** `CREDENTIAL_REVOKED` — current status kills authority |
@@ -26,10 +63,17 @@
 The second row is the thesis: the agent was not "less trusted" — the *action*
 left the scope of its authority. Deterministic policy, not reputation, decides.
 
+**60/60 adversarial security scenarios pass** at image build time (see the
+[Security Tests view](docs/screenshots/17-security-tests.png)): identity
+spoofing, tampered proofs, audience confusion, delegation widening, revocation
+bypass, replay, provider outages, DID-transport abuse — each judged not only on
+the denial reason but on side-effect invariants (the executor really did not
+run; the victim really was not attributed).
+
 ### What this demo is — and is not
 
-- **The executor is a simulation.** `DemoRefundExecutor` moves no money; the dashboard says
-  "Challenge Demo · simulation, not a payment system".
+- **The executor is a simulation.** `DemoRefundExecutor` moves no money; the page says
+  "Simulation · no real money" in the header and "Simulated refund executor — no money moves." on the decision stage.
 - **The agents are server-owned fixtures.** The public API signs custom requests as the demo
   SupportAgent; it demonstrates the trust pipeline, it does not authenticate external callers.
   The *Replay* preset sends the identical signed request twice from the server; the *Revoked* preset revokes a separate isolated
@@ -41,29 +85,7 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
 - **The gateway accepts a single delegation link.** Multi-hop chains are verified and attenuated
   in `packages/delegation` (tested directly) but are not presentable through the gateway in P0.
 
-**60/60 adversarial security scenarios pass** at image build time (see the
-[Security Tests view](docs/screenshots/05-security-tests.png)): identity
-spoofing, tampered proofs, audience confusion, delegation widening, revocation
-bypass, replay, provider outages, DID-transport abuse — each judged not only on
-the denial reason but on side-effect invariants (the executor really did not
-run; the victim really was not attributed).
-
-| | |
-|---|---|
-| ![Trust Profile — live did:web identity, scoped authority](docs/screenshots/01-trust-profile.png) | Trust Profile: what VERIFIED evidence exists for this agent — identity, authority, attestations, history. **No scores anywhere.** |
-| ![120 SAR authorized](docs/screenshots/02-allow-120.png) ![5000 SAR denied](docs/screenshots/03-deny-5000.png) | The pipeline view is rendered from the backend `GatewayResult.stages` — the browser never decides anything. |
-
 **Architecture in one line:** Identity → Claims → Verification → Authority → Policy → Provenance (full diagram in [docs/architecture.md](docs/architecture.md)).
-
-### Quickstart
-
-```bash
-git clone https://github.com/abuzaro21/agent-trust
-cd agent-trust
-docker compose -f docker-compose.demo.yml up --build
-# → http://localhost:3000   (Redis-backed replay; no OPA install needed —
-#   the policy engine runs from the committed, hash-pinned Wasm artifact)
-```
 
 ## The Problem
 
@@ -208,7 +230,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 483 tests in the default `pnpm test` run (435 package tests + the 48 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 473 pass and 10 native-parity cases skip), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 520 tests in the default `pnpm test` run (435 package tests + the 85 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 510 pass and 10 native-parity cases skip), a 78-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|
@@ -242,6 +264,9 @@ pnpm test:attacks       # same suite as a CI gate (exits non-zero on any FAIL)
 # Demo dashboard (Next.js)
 pnpm dev                # http://localhost:3000 — trust console + /attacks security tests
 pnpm test:frontend      # API adapter integration + presentation tests
+pnpm ui:check           # browser checks of the running UI (UI_URL=http://localhost:3000 — layout, keyboard, states)
+pnpm ui:shots           # screenshots + horizontal-overflow report at 1920/1440/768/390 px
+pnpm shots:live         # regenerate docs/screenshots from the real UI
 pnpm build:web          # production build check
 pnpm demo:did:init      # one-time live identity setup → did:web docs + gitignored local keys
 pnpm demo:did:resolve did:web:example.com:agents:support   # real HTTPS resolution + diagnostics

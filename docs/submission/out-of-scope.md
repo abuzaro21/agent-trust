@@ -22,7 +22,7 @@ each exclusion is a scope statement, not an oversight.
 | Application rate limiting / accounts / billing | Public demo with synthetic inputs and per-request fresh task/jti; edge limits belong to the host, not the fabric |
 
 What the P0 instead spent its scope on: making every included layer
-**actually correct** — 483 tests in the default run (435 package + 48
+**actually correct** — 520 tests in the default run (435 package + 85
 apps/web; with OPA on PATH), 5 Redis integration tests, 13 native Rego tests, 60/60
 adversarial scenarios, CI-gated on every push. Known gaps that remain
 (`perDay` quotas, human approval, multi-hop through the gateway, status
