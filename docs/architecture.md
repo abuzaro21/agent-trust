@@ -154,7 +154,7 @@ Decisions are structured objects with deterministic reason codes — never LLM-g
 
 ### Provenance Plane
 
-Every action produces an **ActionReceipt** in an append-only hash chain:
+Every decision that reaches policy (and, separately, each execution outcome) produces an **ActionReceipt** in an append-only hash chain. Requests denied earlier — a failed identity proof, a replay, a credential problem — and infrastructure failures such as an unavailable audit store or a crashed policy engine write no decision receipt:
 
 ```text
 eventHash = SHA-256(previousEventHash || canonical(eventPayload))

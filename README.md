@@ -2,7 +2,7 @@
 
 ## Trust is a grant, not a score.
 
-**A trust & authorization fabric for AI agents.** An agent may act only as far as it was *verifiably* authorized: a DID-proven identity, signed W3C credentials, scoped and revocable delegation, replay protection and a deterministic policy decide every request — never reputation, history or the UI. Every decision leaves a tamper-evident, hash-chained receipt.
+**A trust & authorization fabric for AI agents.** An agent may act only as far as it was *verifiably* authorized: a DID-proven identity, signed W3C credentials, scoped and revocable delegation, replay protection and a deterministic policy decide every request — never reputation, history or the UI. Audit-before-execution: a decision that reaches policy is written to a tamper-evident, hash-chained log *before* anything runs, and nothing executes without that receipt. Requests rejected earlier (a spoofed identity, a replay, a credential problem) or hit by an infrastructure failure are denied without a decision receipt — by design, so nobody can write entries under someone else's name.
 
 > **Live demo (required deliverable):** https://agent-trust.onrender.com
 > **Status (2026-10-28): the public service is suspended** while the merged security fixes are redeployed and re-verified (`smoke:live`, presets, audit chain). Until it is back, run the demo locally with the quickstart below. Current status of the public URL is tracked in [docs/submission/final-submission.md](docs/submission/final-submission.md).
