@@ -51,6 +51,7 @@ export default function Page() {
   const [amount, setAmount] = useState('250');
   const [amountError, setAmountError] = useState<string | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
+  const evSeq = useRef(0);
   // One request at a time. Buttons use aria-disabled (not `disabled`) so keyboard focus is never lost.
   // Each run owns a token; only the owner can release the lock, so a late `finally`
   // from an earlier run can never free a newer run's lock.
@@ -68,11 +69,11 @@ export default function Page() {
     activeRef.current = null;
     setRunning(null);
   }, []);
-  const lastReq = useRef<{ id: string; amount?: number } | null>(null);
-  const evSeq = useRef(0);
+  const lastReq = useRef<{ id: string; amount?: number; step?: 1 | 2 } | null>(null);
   const [evidenceStale, setEvidenceStale] = useState(false);
 
   const refresh = useCallback(async (attempt = 0): Promise<void> => {
+    const generation = evSeq.current; // a newer evidence refresh (after a run) must never be overwritten by this one
     try {
       const [pr, ar, sr] = await Promise.all([
         fetch('/api/agents/support/profile'),
@@ -80,8 +81,11 @@ export default function Page() {
         fetch('/api/demo/status'),
       ]);
       if (!pr.ok || !ar.ok) throw new Error('backend initializing');
-      setProfile(await pr.json());
-      setAudit(await ar.json());
+      const [prJson, arJson] = await Promise.all([pr.json(), ar.json()]);
+      if (generation === evSeq.current) {
+        setProfile(prJson);
+        setAudit(arJson);
+      }
       if (sr.ok) {
         const s = (await sr.json()) as DemoStatus;
         if (s.dids !== undefined) setStatus(s);
@@ -166,24 +170,31 @@ export default function Page() {
     [begin, release, evaluate, reloadEvidence, scrollToVerdict],
   );
 
-  const runBoth = useCallback(async () => {
-    const token = begin('both');
-    if (token === null) return;
-    lastReq.current = { id: 'both' };
-    setErrorPrimary(null);
-    try {
-      await evaluate('valid-120');
-      const second = await evaluate('over-5000');
-      if (second !== undefined) setLast(second);
-      release(token);
-      scrollToVerdict();
-      await reloadEvidence();
-    } catch (e) {
-      setErrorPrimary(e instanceof Error ? e.message : String(e));
-    } finally {
-      release(token);
-    }
-  }, [begin, release, evaluate, reloadEvidence, scrollToVerdict]);
+  const runBoth = useCallback(
+    async (startAt: 1 | 2 = 1) => {
+      const token = begin('both');
+      if (token === null) return;
+      lastReq.current = { id: 'both', step: startAt };
+      setErrorPrimary(null);
+      try {
+        if (startAt === 1) {
+          await evaluate('valid-120');
+          lastReq.current = { id: 'both', step: 2 }; // the 120 SAR leg succeeded: a retry must not repeat it
+        }
+        const second = await evaluate('over-5000');
+        if (second !== undefined) setLast(second);
+        release(token);
+        scrollToVerdict();
+        await reloadEvidence();
+      } catch (e) {
+        setErrorPrimary(e instanceof Error ? e.message : String(e));
+        if (lastReq.current?.step === 2) void reloadEvidence(); // partial success: the first leg is already in the log
+      } finally {
+        release(token);
+      }
+    },
+    [begin, release, evaluate, reloadEvidence, scrollToVerdict],
+  );
 
   const runCustom = useCallback(() => {
     const parsed = parseAmount(amount);
@@ -219,7 +230,7 @@ export default function Page() {
     const req = lastReq.current;
     setErrorPrimary(null);
     if (req === null) return;
-    if (req.id === 'both') void runBoth();
+    if (req.id === 'both') void runBoth(req.step ?? 1);
     else void runPrimary(req.id, req.amount);
   }, [runBoth, runPrimary]);
 

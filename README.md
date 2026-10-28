@@ -209,7 +209,7 @@ in-process inside `apps/web` route handlers.
 
 ## Status & Roadmap
 
-**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 504 tests in the default `pnpm test` run (435 package tests + the 69 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 494 pass and 10 native-parity cases skip), a 43-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
+**Architecture and features frozen for submission; post-audit repairs applied.** Release-verification results (counts are from runs on the release branch, see [docs/submission/final-submission.md](docs/submission/final-submission.md) for the exact record): 504 tests in the default `pnpm test` run (435 package tests + the 69 `apps/web` tests that `pnpm test:frontend` also runs alone; with OPA on PATH all pass, without it 494 pass and 10 native-parity cases skip), a 45-check browser-automation run (`pnpm ui:check`), 5 Redis integration tests, 13 native Rego tests, 60/60 adversarial scenarios. Outstanding for submission: redeploying the public Render service from the release commit and re-verifying it (see [docs/deployment.md](docs/deployment.md)), and the recorded walkthrough.
 
 | Phase | Scope |
 |---|---|

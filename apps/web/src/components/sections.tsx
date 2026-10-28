@@ -318,7 +318,10 @@ export function EvidenceDetails({ record }: { record: RunRecord }) {
             <tr><th scope="row">Outcome</th><td className="mono">{d.outcome}</td></tr>
             <tr><th scope="row">Reason codes</th><td className="mono wrap-any">{d.reasonCodes.join(', ') || '—'}</td></tr>
             <tr><th scope="row">Decision receipt</th><td className="mono wrap-any">{d.decisionReceiptId ?? 'none written'}</td></tr>
-            <tr><th scope="row">Outcome receipt</th><td className="mono wrap-any">{d.executionReceiptId ?? 'none (nothing executed)'}</td></tr>
+            <tr><th scope="row">Outcome receipt</th><td className="mono wrap-any">{d.executionReceiptId ?? (d.stages.execution === 'NOT_RUN' ? 'none (nothing executed)' : 'none recorded')}</td></tr>
+            {record.evaluation.firstResult !== undefined && (
+              <tr><th scope="row">Two sends</th><td>The receipts listed here belong to the first send ({record.evaluation.firstResult.outcome}). The identical re-send ({d.outcome}) was refused before any receipt was written.</td></tr>
+            )}
             {record.evaluation.runReceipts.map((r) => (
               <tr key={r.sequence}><th scope="row">Receipt #{r.sequence} hash</th><td className="mono wrap-any">sha256:{r.eventHash}</td></tr>
             ))}
@@ -585,7 +588,7 @@ export function EvidenceSection({ profile, audit, status }: { profile: ProfileDt
 
       <section className="card" aria-labelledby="audit-title">
         <h3 className="card-title" id="audit-title">Signed audit history</h3>
-        <p className="card-sub">Decisions that reach policy, and the outcomes of executions, are appended to a hash chain; editing or deleting an old entry breaks the chain after it. Requests rejected earlier (a spoofed identity, a replay, a credential problem) are denied but leave no receipt, so nobody can write entries under someone else&apos;s name.</p>
+        <p className="card-sub">When a request reaches policy and the audit store is available, its decision (and later the execution outcome) is appended to a hash chain; editing or deleting an old entry breaks the chain after it. Nothing is recorded for requests rejected earlier (a spoofed identity, a replay, a credential problem), for a policy-engine failure, or during an audit-store outage — so nobody can write entries under someone else&apos;s name, and a missing entry is never evidence of an allowed action.</p>
         {audit === null ? (
           <div className="skeleton" style={{ marginTop: 'var(--s4)' }} aria-busy="true" />
         ) : audit.error !== undefined ? (

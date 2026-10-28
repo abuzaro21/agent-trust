@@ -103,31 +103,31 @@ https://abuzaro21.github.io/agents/refund/did.json
 Each identity has its own P-256 key; private keys live only as deployment
 secrets (never committed, never in the image, never in the browser).
 
-## Verified metrics (post-audit release branch)
+## Verified metrics (each line names the code it was run on)
 
-Executed on a clean worktree of the release branch (code baseline `043257b`),
-Windows 11, Node 24, pinned OPA 1.20.2, Redis 7 for integration. Counts below
-are from those runs; historical counts from the original freeze are not reused.
+Windows 11, Node 24, pinned OPA 1.20.2, Redis 7 for integration. Historical counts from the original freeze are not reused.
 
 ```text
-TypeScript typecheck       0 errors
-default `pnpm test`        504 passed (435 package + 69 apps/web; 494 pass + 10 skip without OPA)
-frontend/API subset        69 passed (`pnpm test:frontend`, already inside the 504)
-browser automation         43/43 checks (`pnpm ui:check`: layout at 4 widths, keyboard, states)
-redis integration          5/5 (Redis 7)
-OPA native tests           13/13
-adversarial suite          60/60 (52 attacks + 8 failure demos)
-production web build       passes
-CI                         green on the original freeze; re-run on the release branch is pending
-live-mode smoke            45/45 against the CURRENT public service, which runs the pre-audit build 4c25b4b;
-                           NOT yet run against a deployment of the release commit
-docker image / compose     see docs/deployment.md "Verification record"
+Security release (92ff923, merged to main as e4ba7eb — tree-identical):
+  typecheck 0 errors · 483 tests in the default run (435 package + 48 apps/web) · Redis integration 5/5
+  OPA native 13/13 · adversarial suite 60/60 (52 attacks + 8 failure demos) · production build · Docker build
+  CI: green on the PR head and on the merge commit e4ba7eb
+  (details: docs/deployment.md "Verification record")
+
+Judge-UI branch feat/agent-trust-judge-ui-20261028 (code verified at e45a7f9; later commits are documentation only):
+  typecheck 0 errors · 504 tests in the default run (435 package + 69 apps/web; 494 pass + 10 skip without OPA)
+  Redis integration 5/5 · OPA native 13/13 · adversarial suite 60/60 · production build
+  browser automation 45/45 checks (`pnpm ui:check` against a local instance: layout at 4 widths, keyboard, states)
+  CI: NOT YET RUN — the branch is not pushed
+
+Public service (https://agent-trust.onrender.com):
+  SUSPENDED for security containment on 2026-10-28 (it ran the pre-audit build 4c25b4b).
+  smoke:live was 45/45 against that old build on 2026-10-28; it has NOT been run against a deployment of the merged code.
 ```
 
-Independent review: a read-only audit by a second model family (Codex
-GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass challenged its
-findings, and the same reviewer re-reviewed the five repair commits (no
-production defects found; one test weakness fixed).
+Independent review: a read-only audit by a second model family (Codex GPT-6.1 Sol) reviewed the implementation, an Opus 5.5 pass
+challenged its findings, and Codex re-reviewed the repair commits and, separately, the UI redesign (9 verified defects fixed, then a
+re-review whose remaining findings were also fixed).
 
 ## Files in this package
 

@@ -34,7 +34,7 @@ Nothing vague; every row is clickable or runnable.
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
 | **Technical depth (25)** | 504 tests in the default run (435 package + 69 apps/web; OPA on PATH needed for all 504) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
-| **Demo quality (20)** | Judge-first dashboard: hero, principals + signed grant, the 120-vs-5,000 SAR decision with a large verdict, a real-order pipeline, failure cards, lifecycle, evidence; 10 screenshots regenerated from the current UI (desktop + mobile); responsive at 1920/1440/768/390 px with 43 automated browser checks; optional video script (once recorded on the public URL) |
+| **Demo quality (20)** | Judge-first dashboard: hero, principals + signed grant, the 120-vs-5,000 SAR decision with a large verdict, a real-order pipeline, failure cards, lifecycle, evidence; 10 screenshots regenerated from the current UI (desktop + mobile); responsive at 1920/1440/768/390 px with 45 automated browser checks; optional video script (once recorded on the public URL) |
 | **Failure thinking (15)** | 60/60 attack suite with invariant checks · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
 
@@ -42,10 +42,12 @@ Nothing vague; every row is clickable or runnable.
 
 | Item | Status |
 |---|---|
-| Typecheck, 504 tests (incl. the 69 apps/web tests), 5 Redis, 13 OPA, 60/60 attacks, build, 43/43 browser checks | PASS on the release branch (see `final-submission.md`) |
+| Security release (`92ff923` → `main` `e4ba7eb`): typecheck, 483 tests, 5 Redis, 13 OPA, 60/60 attacks, build, Docker build | PASS; CI green on the PR head and on the merge commit |
+| Judge-UI branch (code at `e45a7f9`): typecheck, 504 tests (435 package + 69 apps/web), 5 Redis, 13 OPA, 60/60 attacks, build, 45/45 browser checks | PASS locally; CI not yet run (branch not pushed, not merged) |
 | Original malformed-input exploit | Reproduced on the pre-fix code; fixed and covered by regression tests |
-| `smoke:live` 45/45 | PASS against the current public service (pre-audit build 4c25b4b); NOT RUN on a deployment of the release commit |
-| Public HTTPS URL on the release commit, 90-second walkthrough | BLOCKER — URL exists on the old build; walkthrough not recorded |
+| `smoke:live` 45/45 | PASS on 2026-10-28 against the OLD public build (4c25b4b); NOT RUN on a deployment of the merged code |
+| Public HTTPS URL (REQUIRED) | **BLOCKER** — the service is suspended; redeploy the merged code and re-verify |
+| 90-second walkthrough | OPTIONAL but recommended — not recorded; not a submission blocker |
 | Challenge requirements and judging weights | Provided by the project owner (verified by them on the challenge page); not independently re-fetched by the agents |
 | Video take/edit rules, exact form fields | UNVERIFIED |
 | Screenshots | Regenerated from the current UI with real clicks (`pnpm shots:live`); they must be regenerated again if the UI changes |

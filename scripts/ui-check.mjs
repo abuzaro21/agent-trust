@@ -149,6 +149,11 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   check('spoof card: IDENTITY_PROOF_INVALID, "not authenticated", no limit wording', /not authenticated/i.test(spoof) && !/limit|exceed/i.test(spoof.replace(/Spoofed agent[\s\S]*?Run this case/i, '')), spoof.slice(0, 300));
   const mainStill = await page.evaluate(() => document.getElementById('verdict-anchor')?.innerText ?? '');
   check('running a failure card does not overwrite the main verdict', /Authorized/.test(mainStill));
+  const replayBtn = await page.evaluateHandle(() => document.querySelector('#f-replay')?.closest('article')?.querySelector('button') ?? null);
+  await replayBtn.asElement().click();
+  await page.waitForFunction(() => /REPLAY_DETECTED/.test(document.querySelector('#f-replay')?.closest('article')?.innerText ?? ''), { timeout: 30000 });
+  const replay = await page.evaluate(() => document.querySelector('#f-replay').closest('article').textContent);
+  check('replay card: first send vs identical re-send are both shown, and its receipts are attributed to the first send', /First send: AUTHORIZED/.test(replay) && /identical re-send: DENIED/.test(replay) && /Two sends/.test(replay), replay.slice(0, 200));
   const evidence = await page.evaluate(() => document.querySelector('#f-spoof').closest('article').innerText);
   check('failure cards keep per-request evidence (receipts disclosure)', /Evidence & receipts/.test(evidence));
   check('no console errors during the flow', page._errors.length === 0, page._errors.slice(0, 2).join(' | '));
@@ -212,6 +217,27 @@ for (const [w, h] of [[1920, 1080], [1440, 900], [768, 1024], [390, 844]]) {
   await (await buttonByText(page, '^retry$')).click();
   await page.waitForFunction(() => /Authorized/.test(document.getElementById('verdict-anchor')?.innerText ?? ''), { timeout: 30000 });
   check('Retry really re-sends the request (second POST) and recovers to the real result', posts === 2 && page._evaluateRequests === 2, `posts=${posts}`);
+  await page.close();
+}
+{
+  let posts = 0;
+  const page = await open(1440, 900, {
+    intercept: (req) => {
+      if (req.method() === 'POST' && req.url().endsWith('/api/trust/evaluate')) {
+        posts += 1;
+        if (posts === 2) {
+          req.respond({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'GATEWAY_UNAVAILABLE', detail: 'simulated outage on the second leg' }) });
+          return true;
+        }
+      }
+      return false;
+    },
+  });
+  await (await buttonByText(page, '^run both')).click();
+  await page.waitForFunction(() => document.querySelector('#verdict-anchor [role="alert"]'), { timeout: 30000 });
+  await (await buttonByText(page, '^retry$')).click();
+  await page.waitForFunction(() => /Denied/.test(document.getElementById('verdict-anchor')?.innerText ?? ''), { timeout: 30000 });
+  check('"Run both": a failed second leg is retried alone (3 POSTs total, the successful 120 SAR leg is not repeated)', posts === 3, `posts=${posts}`);
   await page.close();
 }
 {
