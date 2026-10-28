@@ -51,7 +51,7 @@ export default function AttacksPage() {
         <section className="hero" style={{ paddingBottom: 0 }}>
           <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Every attack is checked twice.</h1>
           <p className="lead">
-            Each scenario asserts the expected outcome <strong>and</strong> its side-effect invariants — for example that the executor did not run when a request should be denied, and that a spoof is never attributed to its victim.
+            Each scenario asserts its expected outcome <strong>and</strong> reason, and most also assert side-effect or state invariants — for example that the executor did not run when a request should be denied, and that a spoof is never attributed to its victim.
           </p>
         </section>
 

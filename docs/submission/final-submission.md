@@ -53,9 +53,11 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       (52 attacks + 8 failure demos) across identity,
                       credentials, authority, status, replay, policy,
                       audit, attestation, did:web transport, and
-                      infrastructure — each judged on the denial reason AND
-                      side-effect invariants (the executor really did not
-                      run; a spoof is never attributed to the victim).
+                      infrastructure — each judged on its expected outcome and
+                      reason and, for 58 of the 60, on side-effect/state invariants
+                      (the executor really did not run; a spoof is never
+                      attributed to the victim); POLICY-002 and STATUS-004
+                      do not assert one.
                       Every dependency fails CLOSED (a policy-engine crash
                       denies without a receipt). An independent post-freeze
                       audit found and fixed audit-chain poisoning, a dropped

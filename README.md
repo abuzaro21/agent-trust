@@ -66,9 +66,10 @@ left the scope of its authority. Deterministic policy, not reputation, decides.
 **60/60 adversarial security scenarios pass** at image build time (see the
 [Security Tests view](docs/screenshots/17-security-tests.png)): identity
 spoofing, tampered proofs, audience confusion, delegation widening, revocation
-bypass, replay, provider outages, DID-transport abuse — each judged not only on
-the denial reason but on side-effect invariants (the executor really did not
-run; the victim really was not attributed).
+bypass, replay, provider outages, DID-transport abuse — each judged on its
+expected outcome and reason and, for 58 of the 60, on side-effect/state invariants (for
+example that the executor really did not run on a denial and that a spoof was not
+attributed to its victim). The other two do not assert one: `POLICY-002` (a tampered policy manifest refused at load) has no side effect to assert, and `STATUS-004` records its executor count without asserting it.
 
 ### What this demo is — and is not
 
@@ -258,7 +259,7 @@ TEST_REDIS_URL=redis://127.0.0.1:6380 pnpm test:integration
 
 pnpm demo:e2e           # cross-agent gateway demonstration (all real components)
 pnpm demo:profile       # evidence-based Trust Profiles — attestations, history, integrity
-pnpm demo:attacks       # adversarial suite: 60 deterministic scenarios, invariants too
+pnpm demo:attacks       # adversarial suite: 60 deterministic scenarios (58 also assert side-effect/state invariants)
 pnpm test:attacks       # same suite as a CI gate (exits non-zero on any FAIL)
 
 # Demo dashboard (Next.js)
@@ -292,7 +293,7 @@ Implemented packages (Phases 1–6 — identity, credentials, delegation, status
 | `@agent-trust/audit` | Hash-chained Action Receipts (domain-separated SHA-256, RFC 8785 bodies), atomic append, signed checkpoints, tamper/truncation/rewrite detection |
 | `@agent-trust/gateway` | **The Trust Gateway** — composes every layer into one authorized path: PoP → replay → VC/status → delegation chain → VerifiedFacts → policy → decision receipt → idempotent executor → outcome receipt. Receipts only for authenticated actors; audit-before-side-effect; executor unreachable without gateway authorization. |
 | `@agent-trust/trust-profile` | **Trust Profiles (read model)** — contextual, evidence-based answers to "what VERIFIED evidence exists for this agent": resolved identity, active authority with evidence digests, issuer+type-scoped attestations, and aggregated history from the VERIFIED audit chain + signed checkpoint (history fails closed independently). `AgentAttestationCredential` passes the FULL VC pipeline; attestations are EVIDENCE, never authority. The profile schema structurally forbids score fields — no trust/reputation number exists, and the profile never bypasses policy. |
-| `@agent-trust/attacks` | **Adversarial suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each judges the denial reason AND the side-effect invariants (executor calls, victim attribution, cache state, profile immutability); machine-readable `artifacts/attacks/attack-report.{json,md}` |
+| `@agent-trust/attacks` | **Adversarial suite** (`pnpm demo:attacks`) — 60 deterministic scenarios across identity/credential/authority/status/replay/policy/audit/attestation/did:web/infrastructure; each judges the expected outcome and reason, and 58 of the 60 also assert side-effect/state invariants (executor calls, victim attribution, cache state, profile immutability — `POLICY-002` and `STATUS-004` do not); machine-readable `artifacts/attacks/attack-report.{json,md}` |
 
 | `apps/web` | **Demo dashboard** (Next.js, `pnpm dev`) — trust console (profile, presets, pipeline, decision, audit, evidence) + `/attacks` suite view. A pure read model: every decision comes from the real gateway server-side; no trust logic or scores in the browser. |
 
