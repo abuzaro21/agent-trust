@@ -91,14 +91,18 @@ from the **pre-audit** commit `4c25b4b`; because that build had a confirmed audi
 auto-deploy turned **off** on 2026-10-28. The fix was merged by PR #1 (merge commit `e4ba7eb`, CI green) and the judge-facing UI by
 PR #2 (merge commit `0a3e623`, CI green).
 
-**Redeploy (2026-10-28, approved controlled operation).** Render refuses to deploy a suspended service (`render deploys create` →
+**Current release (2026-10-28): `f004ae8`.** PR #3 (regular merge commit `f004ae818cdbba9f8183d35f2147d318a73d1a42`, tree `50b2c85e0500ca605f6cb2c1fe64fb82c4e6189f`, identical to the audited PR head `2f554ee`) adds the hardened attack-suite assurance, its tests, documentation and the `/attacks` presentation copy; no gateway, crypto, DID, replay, policy/Wasm, audit, VC, delegation or status code changed. GitHub CI on `main` at `f004ae8` is green ([run 40750984910](https://github.com/abuzaro21/agent-trust/actions/runs/40750984910)). It was deployed to the **existing** service with `render deploys create srv-… --commit f004ae818cdbba9f8183d35f2147d318a73d1a42` — no suspend, no restart, auto-deploy untouched — as deploy `dep-dbh4jf8n74is73bjpeb0` (created 19:15:09Z, live 19:17:07Z, 1 min 57 s). The deploy for `0a3e623` (`dep-dbgvq5egekts738vh0ug`) and the pre-audit `4c25b4b` deploys are `deactivated`; the vulnerable `4c25b4b` build was never redeployed.
+
+**Verified on the deployed `f004ae8` build (author-run, 2026-10-28):** `/api/health` → `status ok`, `identityMode web`, `build.sha f004ae8` (matches Render's deployed commit metadata); `/api/demo/status` → `identityMode web`, `replayStore redis`; `pnpm smoke:live` **45/45** (three did:web documents, trust profile, 120 SAR allowed + executed, 5,000 SAR denied + executor not run, spoof / revoked / replay, stored report 60/60, secret and header checks); a real-click browser check of the public site **15/15** (grant read from the backend, comparison from the two responses, failure cards, audit chain and checkpoint valid, mobile); a real-browser check of the public `/attacks` page and claim wording **15/15** (corrected headline, six showcase cards with typed outcome badges, all 60 table rows PASS, the stored report's typed verdicts and the 49 / 11 reason-code split, and no stale wording on `/` or `/attacks`); a scan of 400 build-log entries and 150 runtime-log entries found no real errors and no secret patterns (one build-log match was the scenario title "Private key material in the served document" printed by the build-time attack suite). Service flags afterwards: not suspended, auto-deploy **off**, plan Free; the environment-variable names were not changed and no values were read. These live checks are author-run; the independent Codex review covered the repository code, not the live service.
+
+**Earlier redeploy (2026-10-28, approved controlled operation) — release `0a3e623`.** Render refuses to deploy a suspended service (`render deploys create` →
 HTTP 400 `cannot deploy suspended service`), so the service was **resumed and the exact commit deployed in one scripted run** with a
 10-minute fail-safe (suspend on failure or timeout). Render did not create a deploy on resume; the API deploy for `0a3e623` went
 live 111 s after the resume (deploy `dep-dbgvq5egekts738vh0ug`). **Exposure note:** the previous build `4c25b4b` first answered plain `/api/health` polling 24 s after the resume (no other requests
 were sent to it); Render marked the new deployment live at 111 s, so the interval was approximately 87 s; the exact public cutover time
 was not recorded. The older deploys are `deactivated`.
 
-**Verified on the deployed build:** `/api/health` → `status ok`, `identityMode web`, `build.sha 0a3e623` (matches Render's deployed
+**Verified on that earlier build (`0a3e623`, superseded by the release above):** `/api/health` → `status ok`, `identityMode web`, `build.sha 0a3e623` (matches Render's deployed
 commit); `/api/demo/status` → `replayStore redis`; `pnpm smoke:live` **45/45**; a real-click browser check of the public site
 **15/15** (grant read from the backend, 120 SAR allowed, 5,000 SAR denied, comparison from the two responses, spoof / revoked /
 replay, audit chain and checkpoint valid, 60/60 report); a scan of 400 build-log and 150 runtime-log lines found zero
@@ -190,7 +194,7 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Gate | Result |
 |---|---|
 | TypeScript typecheck | PASS |
-| Default `pnpm test` (OPA on PATH; judge-UI code at `71b3ef6`) | PASS — 520/520 in 47 files (435 package tests + the 85 `apps/web` tests); without OPA: 510 pass + 10 skipped. Under heavy CPU contention one pre-existing property test (`packages/status`, 5 s timeout) has intermittently timed out in the parallel run and passes alone |
+| Default `pnpm test` (OPA on PATH; audited code `2f554ee`, the tree merged as `f004ae8`) | PASS — 662/662 in 51 files (577 package tests + the 85 `apps/web` tests); the native-parity cases skip without OPA. Run by the author and independently re-run by Codex; GitHub CI also runs the test job on the merge commit. Under heavy CPU contention one pre-existing property test (`packages/status`, 5 s timeout) has intermittently timed out in the parallel run and passes alone |
 | `pnpm test:frontend` (the `apps/web` subset alone) | PASS — 85/85 (6 files) |
 | `pnpm ui:check` (browser automation of the single-stage UI, local instance) | PASS — 78/78 (layout at 4 widths, light/dark theme, empty state before any request, ALLOW/DENY, authorization vs execution, response-derived comparison, failure cases, evidence disclosures, mobile scroll-into-view with focus kept, loading/error/retry/validation, reduced motion) |
 | Redis integration (disposable `redis:7-alpine`) | PASS — 5/5 |
@@ -202,8 +206,8 @@ Executed locally (Windows 11, Docker 29.9.2, Node 24, OPA 1.20.2). `PASS` = exec
 | Demo presets (8) against the container | PASS — same reason codes as documented |
 | Malformed-input exploit (`amount` −5 / 0 / "abc", `currency` "SARX") against the container | PASS — `REQUEST_MALFORMED`, no receipt, audit `chain.valid: true` |
 | `GET /api/attacks/report?run=1` | PASS — serves the stored artifact; runs nothing |
-| `smoke:live` (45 checks) against https://agent-trust.onrender.com | PASS 45/45 on 2026-10-28 against the **deployed `0a3e623`** (an earlier run that day, 45/45 against the old `4c25b4b`, is superseded) |
-| Redeploy of the release commit to Render | DONE 2026-10-28 — controlled resume + deploy of `0a3e623` (see "Public status"); health, status, smoke and UI checks passed on the deployed build |
+| `smoke:live` (45 checks) against https://agent-trust.onrender.com | PASS 45/45 on 2026-10-28 against the **deployed `f004ae8`** (author-run). Earlier the same day: 45/45 against `0a3e623` and, before that, against the old `4c25b4b` — both superseded |
+| Redeploy of the release commit to Render | DONE 2026-10-28 — `f004ae8` deployed to the existing service as `dep-dbh4jf8n74is73bjpeb0` (no suspend/restart); health, status, smoke, UI and `/attacks` checks passed on the deployed build. Earlier that day: controlled resume + deploy of `0a3e623` (see "Public status") |
 
 Known cosmetic caveat: the `/attacks` page badge `baseline 414cbaa` is a historical constant in `packages/attacks/src/runner.ts`
 (the commit the suite was first baselined at), **not** the build SHA — do not narrate it as the deployed commit.
