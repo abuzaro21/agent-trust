@@ -1,4 +1,5 @@
-import type { AttackObserved, AttackScenario } from './types.js';
+import type { AttackScenario } from './types.js';
+import { allOf, requireAtLeast, requireInvariants, type InvariantCheck } from './oracle.js';
 import { IDENTITY_SCENARIOS } from './scenarios-identity.js';
 import { CREDENTIAL_SCENARIOS } from './scenarios-identity.js';
 import { AUTHORITY_SCENARIOS } from './scenarios-authority.js';
@@ -13,289 +14,129 @@ import { INFRA_SCENARIOS } from './scenarios-infra.js';
  * Step 13B — the deterministic attack registry. IDs are stable and
  * referenced by docs/threat-model.md and the README video shortlist.
  *
- * Step 13N — every scenario carries an invariant checker beyond the
- * reason code: a denial alone proves nothing if the side effect happened
- * anyway. A scenario PASSes only when (a) the expected reason/outcome
- * holds AND (b) the security invariants hold.
+ * Every scenario has an invariant checker beyond the reason code: a denial
+ * alone proves nothing if the side effect happened anyway. The checkers use
+ * the strict helpers in ./oracle.ts — a key the scenario forgot to record
+ * FAILS the check (it can never pass by omission), and every checker
+ * rejects an empty observation (asserted by test/registry-integrity.test.ts).
  */
 
-export type InvariantCheck = (observed: AttackObserved) => { ok: boolean; detail?: string };
+export type { InvariantCheck };
+
+/** Gateway rejected the request before policy or executor could act. */
+const blockedBeforePolicy: InvariantCheck = (o) => requireInvariants(o, { executorCalls: 0, policyCalls: 0 });
+
+/** Policy RAN (and denied); the executor never did. */
+const deniedByPolicy: InvariantCheck = (o) => allOf(requireInvariants(o, { executorCalls: 0 }), requireAtLeast(o, 'policyCalls', 1));
+
+/** Credential/status gate stopped the request: neither policy nor executor ran, and the credential stage is the typed cause. */
+const stoppedAtCredentialStage: InvariantCheck = (o) =>
+  requireInvariants(o, { executorCalls: 0, policyCalls: 0, credentialStage: 'FAIL' });
+
+/** Resolver refused a bad did:web response: nothing was cached and the same transport DOES serve a good document. */
+const didDocumentRefused: InvariantCheck = (o) => {
+  const base = requireInvariants(o, { controlResolves: true, notCached: true });
+  const err = (o.invariants as Record<string, unknown>).resolutionError;
+  return allOf(base, typeof err === 'string' && err.length > 0 ? { ok: true } : { ok: false, detail: `resolutionError must be a typed DID-Core error, got ${JSON.stringify(err)}` });
+};
+
+/** SSRF guard refused before any connect attempt and the same transport DOES connect to a public address. */
+const ssrfBlockedBeforeConnect: InvariantCheck = (o) =>
+  requireInvariants(o, { blockedPreConnect: true, connectAttempts: 0, controlPublicAddressConnects: true });
+
+/**
+ * Tampering is caught on a history that verified cleanly beforehand (chain + signed checkpoint intact, and the
+ * production consumer — TrustProfileService — accepts it), so the detection is caused by the mutation alone.
+ */
+const auditTamperDetected = (extra: Record<string, unknown>): InvariantCheck => (o) =>
+  requireInvariants(o, { controlIntact: true, controlConsumerHistoryVerified: true, ...extra });
 
 export const INVARIANT_CHECKS: Record<string, InvariantCheck> = {
   'IDENTITY-001': (o) => {
-    const i = o.invariants as Record<string, { allow: number; deny: number } | number>;
-    const hist = i.victimHistoryDecisions as { allow: number; deny: number };
-    return i.policyCalls === 0 && i.executorCalls === 0 && i.victimReceiptsAdded === 0 && hist.allow === 0 && hist.deny === 0
-      ? { ok: true }
-      : { ok: false, detail: `victim must be untouched: ${JSON.stringify(i)}` };
+    const hist = (o.invariants as Record<string, { allow?: number; deny?: number } | undefined>).victimHistoryDecisions;
+    return allOf(
+      requireInvariants(o, { policyCalls: 0, executorCalls: 0, victimReceiptsAdded: 0 }),
+      hist !== undefined && hist.allow === 0 && hist.deny === 0
+        ? { ok: true }
+        : { ok: false, detail: `victim decision history must be untouched, got ${JSON.stringify(hist)}` },
+    );
   },
-  'IDENTITY-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0
-      ? { ok: true }
-      : { ok: false, detail: `policy/executor must not run: ${JSON.stringify(i)}` };
-  },
-  'IDENTITY-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0
-      ? { ok: true }
-      : { ok: false, detail: `policy must never see tampered values: ${JSON.stringify(i)}` };
-  },
-  'IDENTITY-004': (o) => {
-    const i = o.invariants as Record<string, unknown>;
-    return i.positiveControlAuthorized === true && i.executorCalls === 0
-      ? { ok: true }
-      : { ok: false, detail: `legitimate destination must still work, attacker must not: ${JSON.stringify(i)}` };
-  },
-  'CREDENTIAL-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'CREDENTIAL-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'CREDENTIAL-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'CREDENTIAL-004': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'CREDENTIAL-005': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'CREDENTIAL-006': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUTHORITY-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    // The showcase: policy RAN (correctly denied); executor never did.
-    return (i.policyCalls ?? 0) >= 1 && i.executorCalls === 0
-      ? { ok: true }
-      : { ok: false, detail: `policy should run and executor must not: ${JSON.stringify(i)}` };
-  },
-  'AUTHORITY-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUTHORITY-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUTHORITY-004': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUTHORITY-005': (o) => {
-    const i = o.invariants as Record<string, number>;
-    // Attenuation must reject BEFORE policy evaluation.
-    return i.policyCalls === 0 && i.executorCalls === 0
-      ? { ok: true }
-      : { ok: false, detail: `attenuation must stop before policy: ${JSON.stringify(i)}` };
-  },
-  'AUTHORITY-006': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'STATUS-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'STATUS-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'STATUS-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'STATUS-004': () => ({ ok: true }),
-  'STATUS-005': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'STATUS-006': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'REPLAY-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.successfulRefunds === 1 && i.executorCalls === 1
-      ? { ok: true }
-      : { ok: false, detail: `exactly one logical refund: ${JSON.stringify(i)}` };
-  },
-  'REPLAY-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    const m = /authorized=(\d+) denied=(\d+)/.exec(o.outcome);
-    return Number(m?.[1]) === 1 && Number(m?.[2]) === 99 && i.successfulRefunds === 1
-      ? { ok: true }
-      : { ok: false, detail: `100-way race must yield 1/99: ${o.outcome}` };
-  },
-  'REPLAY-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.policyCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'REPLAY-004': (o) => {
-    const i = o.invariants as Record<string, number | boolean>;
-    return i.legitAuthorized === true && i.successfulRefunds === 1 && i.executorCalls === 1
-      ? { ok: true }
-      : { ok: false, detail: `poisoning must not block the legitimate request: ${JSON.stringify(i)}` };
-  },
-  'POLICY-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'POLICY-002': () => ({ ok: true }),
-  'POLICY-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'POLICY-004': (o) => {
-    const i = o.invariants as Record<string, unknown>;
-    return i.schemaRejectedScore === true
-      ? { ok: true }
-      : { ok: false, detail: `trustScore field must be schema-inexpressible: ${JSON.stringify(i)}` };
-  },
-  'AUDIT-001': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid && !i.anchoredValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-002': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid && !i.anchoredValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-003': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-004': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-005': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-006': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.chainValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-007': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.rewrittenChainCoherent === true && i.checkpointRejected === true
-      ? { ok: true }
-      : { ok: false, detail: `coherent rewrite must still fail the checkpoint: ${JSON.stringify(i)}` };
-  },
-  'AUDIT-008': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.anchoredValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'AUDIT-009': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return !i.checkpointValid ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'ATTEST-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.victimAuthorityCount === 1 && i.victimTrustedAttestations === 0
-      ? { ok: true }
-      : { ok: false, detail: `vouch must not touch authority: ${JSON.stringify(i)}` };
-  },
-  'ATTEST-002': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.victimTrustedAttestations === 0 && i.sybilRejected === 100 && i.victimAuthorityCount === 1
-      ? { ok: true }
-      : { ok: false, detail: `100 Sybils must change NOTHING trusted: ${JSON.stringify(i)}` };
-  },
-  'ATTEST-003': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 && i.victimTrustedAttestations === 2
-      ? { ok: true }
-      : { ok: false, detail: `vouches ≠ authority: ${JSON.stringify(i)}` };
-  },
-  'ATTEST-004': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.victimTrustedAttestations === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'ATTEST-005': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.victimTrustedAttestations === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-001': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.notCached === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-002': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.blockedPreConnect === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-003': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.blockedPreConnect === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-004': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.blockedPreConnect === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-005': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.blockedPreConnect === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-006': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.notCached === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-007': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.notCached === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-008': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.notCached === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-009': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.notCached === true ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-010': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.firstFailed && i.secondSucceeded ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'DIDWEB-011': (o) => {
-    const i = o.invariants as Record<string, boolean>;
-    return i.refetchedEveryResolve === true && i.keyRotated === true
-      ? { ok: true }
-      : { ok: false, detail: `max-age=0 must force revalidation: ${JSON.stringify(i)}` };
-  },
-  'INFRA-001': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'INFRA-002': (o) => {
-    const i = o.invariants as Record<string, unknown>;
-    return i.decisionEffect === 'ALLOW' && i.outcomeState === 'FAILED' && i.decisionAndOutcomeChained === true
-      ? { ok: true }
-      : { ok: false, detail: JSON.stringify(i) };
-  },
-  'INFRA-003': (o) => {
-    const i = o.invariants as Record<string, unknown>;
-    return i.outcome === 'EXECUTION_UNCERTAIN' && i.executorCalls === 1
-      ? { ok: true }
-      : { ok: false, detail: `no blind retry: ${JSON.stringify(i)}` };
-  },
-  'INFRA-004': (o) => {
-    const i = o.invariants as Record<string, number>;
-    return i.executorCalls === 0 ? { ok: true } : { ok: false, detail: JSON.stringify(i) };
-  },
-  'INFRA-005': (o) => {
-    const i = o.invariants as Record<string, unknown>;
-    return i.executorCalls === 0 && i.policySkipped === true
-      ? { ok: true }
-      : { ok: false, detail: JSON.stringify(i) };
-  },
+  'IDENTITY-002': blockedBeforePolicy,
+  'IDENTITY-003': blockedBeforePolicy,
+  'IDENTITY-004': (o) => requireInvariants(o, { positiveControlAuthorized: true, executorCalls: 0 }),
+  'CREDENTIAL-001': blockedBeforePolicy,
+  'CREDENTIAL-002': blockedBeforePolicy,
+  'CREDENTIAL-003': blockedBeforePolicy,
+  'CREDENTIAL-004': blockedBeforePolicy,
+  'CREDENTIAL-005': blockedBeforePolicy,
+  'CREDENTIAL-006': blockedBeforePolicy,
+  // The showcase: policy RAN (correctly denied); executor never did.
+  'AUTHORITY-001': deniedByPolicy,
+  'AUTHORITY-002': deniedByPolicy,
+  'AUTHORITY-003': deniedByPolicy,
+  'AUTHORITY-004': deniedByPolicy,
+  // Delegation walker, exercised directly (the gateway accepts a single link): rejects the attack, accepts the control.
+  'AUTHORITY-005': (o) => requireInvariants(o, { walkerRejected: true, controlAttenuatedChainAccepted: true }),
+  'AUTHORITY-006': (o) => requireInvariants(o, { walkerRejected: true, controlWithinBudgetChainAccepted: true }),
+  'STATUS-001': blockedBeforePolicy,
+  'STATUS-002': blockedBeforePolicy,
+  'STATUS-003': blockedBeforePolicy,
+  // The tampered / foreign / unreachable status list stops the request at the credential stage: no policy, no executor.
+  'STATUS-004': stoppedAtCredentialStage,
+  'STATUS-005': stoppedAtCredentialStage,
+  'STATUS-006': stoppedAtCredentialStage,
+  'REPLAY-001': (o) => requireInvariants(o, { firstAuthorized: true, secondDenied: true, successfulRefunds: 1, executorCalls: 1 }),
+  'REPLAY-002': (o) =>
+    requireInvariants(o, { authorizedCount: 1, deniedCount: 99, replayDeniedCount: 99, successfulRefunds: 1, executorCalls: 1 }),
+  'REPLAY-003': blockedBeforePolicy,
+  'REPLAY-004': (o) => requireInvariants(o, { attackerDenied: true, legitAuthorized: true, successfulRefunds: 1, executorCalls: 1 }),
+  // Loader boundary: the genuine artifact loads (control), the corrupted ones never yield an engine.
+  'POLICY-001': (o) =>
+    requireInvariants(o, {
+      controlLoadsEngine: true,
+      flippedByteStage: 'hash_mismatch',
+      flippedByteEngineObtainable: false,
+      garbageWithMatchingDigestPassesDigestGate: true,
+      garbageRefusedAtInstantiation: true,
+      garbageEngineObtainable: false,
+    }),
+  'POLICY-002': (o) => requireInvariants(o, { controlLoadsEngine: true, refusalStage: 'hash_mismatch', engineObtainable: false }),
+  'POLICY-003': (o) => requireInvariants(o, { executorCalls: 0 }),
+  'POLICY-004': (o) => requireInvariants(o, { schemaRejectedScore: true, controlValidWithoutScore: true, engineDecisionEffect: 'DENY' }),
+  // Interior mutation / deletion / reorder / forgery / splice: the chain verifier rejects, and so does the consumer.
+  'AUDIT-001': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  'AUDIT-002': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  'AUDIT-003': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  'AUDIT-004': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  'AUDIT-005': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  'AUDIT-006': auditTamperDetected({ chainValid: false, consumerHistoryVerified: false }),
+  // A coherent rewrite passes the chain walk by construction; the signed checkpoint must still reject it.
+  'AUDIT-007': auditTamperDetected({ rewrittenChainCoherent: true, checkpointRejected: true, consumerHistoryVerified: false }),
+  'AUDIT-008': auditTamperDetected({ anchoredValid: false, consumerHistoryVerified: false }),
+  // Forged checkpoint (wrong signer): the genuine one verifies under the same pin, the forgery does not.
+  'AUDIT-009': (o) => requireInvariants(o, { controlIntact: true, controlPinnedGenuineVerifies: true, checkpointValid: false }),
+  'ATTEST-001': (o) => requireInvariants(o, { victimAuthorityCount: 1, controlTrustedAttestations: 1, untrustedRejected: 1 }),
+  'ATTEST-002': (o) =>
+    requireInvariants(o, { policyDeniedOverLimit: true, victimTrustedAttestations: 0, sybilRejected: 100, victimAuthorityCount: 1 }),
+  'ATTEST-003': (o) => requireInvariants(o, { executorCalls: 0, victimTrustedAttestations: 2 }),
+  'ATTEST-004': (o) => requireInvariants(o, { trustedBefore: 1, victimTrustedAttestations: 0 }),
+  'ATTEST-005': (o) => requireInvariants(o, { controlTrustedAttestations: 1, wrongSubjectRejected: 1 }),
+  'DIDWEB-001': didDocumentRefused,
+  'DIDWEB-002': ssrfBlockedBeforeConnect,
+  'DIDWEB-003': ssrfBlockedBeforeConnect,
+  'DIDWEB-004': ssrfBlockedBeforeConnect,
+  'DIDWEB-005': ssrfBlockedBeforeConnect,
+  'DIDWEB-006': didDocumentRefused,
+  'DIDWEB-007': didDocumentRefused,
+  'DIDWEB-008': didDocumentRefused,
+  'DIDWEB-009': didDocumentRefused,
+  'DIDWEB-010': (o) => requireInvariants(o, { firstFailed: true, secondSucceeded: true, secondResolvedToExpectedDid: true }),
+  'DIDWEB-011': (o) => requireInvariants(o, { refetchedEveryResolve: true, keyRotated: true, keyAfterIsRotatedKey: true }),
+  'INFRA-001': (o) => requireInvariants(o, { executorCalls: 0, policyAllowedThenAuditVeto: true }),
+  'INFRA-002': (o) => requireInvariants(o, { decisionEffect: 'ALLOW', outcomeState: 'FAILED', decisionAndOutcomeChained: true }),
+  'INFRA-003': (o) => requireInvariants(o, { outcome: 'EXECUTION_UNCERTAIN', executorCalls: 1, auditAppendAttempts: 2 }),
+  'INFRA-004': (o) => requireInvariants(o, { executorCalls: 0 }),
+  'INFRA-005': (o) => requireInvariants(o, { executorCalls: 0, policySkipped: true }),
 };
 
 export const ATTACK_REGISTRY: readonly AttackScenario[] = [

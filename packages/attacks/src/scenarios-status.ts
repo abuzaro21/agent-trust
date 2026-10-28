@@ -11,13 +11,14 @@ export const STATUS_001: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Revoked credential — same legitimate agent and key',
-  expected: { outcome: 'DENY at status stage, before policy', reasonCode: 'CREDENTIAL_REVOKED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at status stage, before policy', reasonCode: 'CREDENTIAL_REVOKED' },
   async run() {
     const w = await buildAttackWorld();
     await w.statusManager.revoke(w.revListId, w.delegationStatusIndex);
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_revoked' }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -29,7 +30,7 @@ export const STATUS_002: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Suspended credential (reversible mechanism)',
-  expected: { outcome: 'DENY at status stage', reasonCode: 'CREDENTIAL_SUSPENDED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at status stage', reasonCode: 'CREDENTIAL_SUSPENDED' },
   async run() {
     const w = await buildAttackWorld();
     // Re-issue the delegation anchored on the SUSPENSION list.
@@ -45,6 +46,7 @@ export const STATUS_002: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_susp', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -56,13 +58,14 @@ export const STATUS_003: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Quarantined agent — everything else valid (per-identity kill switch)',
-  expected: { outcome: 'DENY at quarantine stage', reasonCode: 'AGENT_QUARANTINED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at quarantine stage', reasonCode: 'AGENT_QUARANTINED' },
   async run() {
     const w = await buildAttackWorld();
     w.quarantine.quarantine('did:web:trust.example.com:agents:support', 'suspected key compromise');
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_quar' }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage identity=${result.stages.identity})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -74,7 +77,7 @@ export const STATUS_004: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Tampered status list (corrupted bitstring in the status store)',
-  expected: { outcome: 'fail closed on undecodable status data', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
+  expected: { verdict: 'DENIED', outcome: 'fail closed on undecodable status data', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
   async run() {
     const w = await buildAttackWorld();
     // Full-database attacker: poison the encoded bitstring behind the
@@ -85,8 +88,9 @@ export const STATUS_004: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_statustamper' }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n, credentialStage: result.stages.credential },
     };
   },
 };
@@ -96,7 +100,7 @@ export const STATUS_005: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Foreign issuer status list (controller ≠ credential issuer)',
-  expected: { outcome: 'fail closed — status list controlled by someone else', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
+  expected: { verdict: 'DENIED', outcome: 'fail closed — status list controlled by someone else', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
   async run() {
     const w = await buildAttackWorld();
     // Credential claims the AUDITOR's list while being issued by the org.
@@ -111,8 +115,9 @@ export const STATUS_005: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_foreign', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n, credentialStage: result.stages.credential },
     };
   },
 };
@@ -122,7 +127,7 @@ export const STATUS_006: AttackScenario = {
   category: 'STATUS',
   kind: 'ATTACK',
   title: 'Declared status mechanism, checker unavailable',
-  expected: { outcome: 'fail closed', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
+  expected: { verdict: 'DENIED', outcome: 'fail closed', reasonCode: 'CREDENTIAL_STATUS_UNAVAILABLE' },
   async run() {
     const w = await buildAttackWorld();
     // Present a credential with a status entry whose list does not exist.
@@ -139,8 +144,9 @@ export const STATUS_006: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_nostatus', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n, credentialStage: result.stages.credential },
     };
   },
 };

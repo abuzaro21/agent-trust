@@ -15,7 +15,7 @@ export const IDENTITY_001: AttackScenario = {
   category: 'IDENTITY',
   kind: 'ATTACK',
   title: 'Spoofed agent: EvilAgent claims SupportAgent DID, signs with its own key',
-  expected: { outcome: 'DENY at identity stage, before policy', reasonCode: 'IDENTITY_PROOF_INVALID' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at identity stage, before policy', reasonCode: 'IDENTITY_PROOF_INVALID' },
   async run() {
     const w = await buildAttackWorld();
     const receiptsBefore = (await w.auditLog.readStream('attack-demo')).filter((r) => r.body.actor.did === 'did:web:trust.example.com:agents:support').length;
@@ -36,6 +36,7 @@ export const IDENTITY_001: AttackScenario = {
     }).build('did:web:trust.example.com:agents:support', { now: NOW });
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage identity=${result.stages.identity})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: {
         executorCalls: w.executor.callCount.total,
@@ -54,7 +55,7 @@ export const IDENTITY_002: AttackScenario = {
   category: 'IDENTITY',
   kind: 'ATTACK',
   title: 'Wrong kid: valid proof references a verification method owned by another DID',
-  expected: { outcome: 'DENY at identity stage', reasonCode: 'IDENTITY_PROOF_INVALID' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at identity stage', reasonCode: 'IDENTITY_PROOF_INVALID' },
   async run() {
     const w = await buildAttackWorld();
     const request = await w.task({ taskId: 'atk_wrongkid' });
@@ -67,6 +68,7 @@ export const IDENTITY_002: AttackScenario = {
     const result = await w.gateway.handleTask(request);
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage identity=${result.stages.identity})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -78,7 +80,7 @@ export const IDENTITY_003: AttackScenario = {
   category: 'IDENTITY',
   kind: 'ATTACK',
   title: 'Signed-body tamper: 120 SAR signed, 5000 SAR on the wire',
-  expected: { outcome: 'DENY at identity stage — policy never sees attacker values', reasonCode: 'IDENTITY_PROOF_INVALID' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at identity stage — policy never sees attacker values', reasonCode: 'IDENTITY_PROOF_INVALID' },
   async run() {
     const w = await buildAttackWorld();
     const request = await w.task({ amount: 120, taskId: 'atk_tamper' });
@@ -86,6 +88,7 @@ export const IDENTITY_003: AttackScenario = {
     const result = await w.gateway.handleTask(request);
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage identity=${result.stages.identity})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -97,7 +100,7 @@ export const IDENTITY_004: AttackScenario = {
   category: 'IDENTITY',
   kind: 'ATTACK',
   title: 'Wrong audience: a correctly-signed proof aimed at a different service',
-  expected: { outcome: 'DENY at policy (audience scope)', reasonCode: 'AUDIENCE_MISMATCH' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at policy (audience scope)', reasonCode: 'AUDIENCE_MISMATCH' },
   async run() {
     const w = await buildAttackWorld();
     // Properly SIGNED for a different audience — identity is valid, the
@@ -109,6 +112,7 @@ export const IDENTITY_004: AttackScenario = {
     const legit = await w.gateway.handleTask(await w.task({ taskId: 'atk_audience_ok' }));
     return {
       outcome: result.effect === 'DENY' ? `DENY at policy (stage=${result.stages.policy}); positive control: ${legit.outcome}` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: {
         // The ATTACKER caused zero executions; only the positive control ran.
@@ -128,7 +132,7 @@ export const CREDENTIAL_001: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Tampered VC: payload edited after signing',
-  expected: { outcome: 'DENY at credential stage', reasonCode: 'VC_SIGNATURE_INVALID' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at credential stage', reasonCode: 'VC_SIGNATURE_INVALID' },
   async run() {
     const w = await buildAttackWorld();
     // Tamper the VC FIRST (payload edited after signing), THEN sign the
@@ -144,6 +148,7 @@ export const CREDENTIAL_001: AttackScenario = {
     const result = await w.gateway.handleTask(request);
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -155,7 +160,7 @@ export const CREDENTIAL_002: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Wrong issuer key: VC signed by a key the issuer DID does not own',
-  expected: { outcome: 'DENY — signature/issuer binding fails', reasonCode: 'VC_ISSUER_KEY_MISMATCH' },
+  expected: { verdict: 'DENIED', outcome: 'DENY — signature/issuer binding fails', reasonCode: 'VC_ISSUER_KEY_MISMATCH' },
   async run() {
     const w = await buildAttackWorld();
     // Evil mints a delegation CLAIMING the org as issuer but signing with
@@ -170,6 +175,7 @@ export const CREDENTIAL_002: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_wrongkey', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -181,7 +187,7 @@ export const CREDENTIAL_003: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Valid signature, untrusted issuer (crypto-valid ≠ trusted)',
-  expected: { outcome: 'DENY — issuer trust is a separate decision', reasonCode: 'UNTRUSTED_ISSUER' },
+  expected: { verdict: 'DENIED', outcome: 'DENY — issuer trust is a separate decision', reasonCode: 'UNTRUSTED_ISSUER' },
   async run() {
     const w = await buildAttackWorld();
     // Evil signs its own well-formed delegation under its OWN did:web
@@ -196,6 +202,7 @@ export const CREDENTIAL_003: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_untrusted', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -207,7 +214,7 @@ export const CREDENTIAL_004: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Expired credential',
-  expected: { outcome: 'DENY', reasonCode: 'VC_EXPIRED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY', reasonCode: 'VC_EXPIRED' },
   async run() {
     const w = await buildAttackWorld();
     const index = await w.nextRevIndex();
@@ -224,6 +231,7 @@ export const CREDENTIAL_004: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_expired', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -235,7 +243,7 @@ export const CREDENTIAL_005: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Not-yet-valid credential',
-  expected: { outcome: 'DENY', reasonCode: 'VC_NOT_YET_VALID' },
+  expected: { verdict: 'DENIED', outcome: 'DENY', reasonCode: 'VC_NOT_YET_VALID' },
   async run() {
     const w = await buildAttackWorld();
     const index = await w.nextRevIndex();
@@ -252,6 +260,7 @@ export const CREDENTIAL_005: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_nfv', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage credential=${result.stages.credential})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -263,7 +272,7 @@ export const CREDENTIAL_006: AttackScenario = {
   category: 'CREDENTIAL',
   kind: 'ATTACK',
   title: 'Subject mismatch: credential issued for another agent',
-  expected: { outcome: 'DENY — delegation chain must end at the actor', reasonCode: 'WRONG_SUBJECT' },
+  expected: { verdict: 'DENIED', outcome: 'DENY — delegation chain must end at the actor', reasonCode: 'WRONG_SUBJECT' },
   async run() {
     const w = await buildWorldWithOtherSubject();
     // Actor SUPPORT_DID presents a credential whose subject is EVIL_DID.
@@ -272,6 +281,7 @@ export const CREDENTIAL_006: AttackScenario = {
     );
     return {
       outcome: result.effect === 'DENY' ? `DENY (stage authority=${result.stages.authority})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };

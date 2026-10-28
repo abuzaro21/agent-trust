@@ -12,7 +12,7 @@ export const AUTHORITY_001: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Amount escalation: 5000 SAR against a 500 SAR delegation',
-  expected: { outcome: 'DENY at policy — identity/credential/status/replay all PASS', reasonCode: 'AUTHORITY_LIMIT_EXCEEDED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at policy — identity/credential/status/replay all PASS', reasonCode: 'AUTHORITY_LIMIT_EXCEEDED' },
   async run() {
     const w = await buildAttackWorld();
     const result = await w.gateway.handleTask(await w.task({ amount: 5000, taskId: 'atk_amount' }));
@@ -21,6 +21,7 @@ export const AUTHORITY_001: AttackScenario = {
         result.effect === 'DENY' && result.stages.identity === 'PASS' && result.stages.credential === 'PASS'
           ? `DENY at policy (identity=${result.stages.identity}, credential=${result.stages.credential}, replay=${result.stages.replay})`
           : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
@@ -32,7 +33,7 @@ export const AUTHORITY_002: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Action escalation: request refund:create with an order:read-only delegation',
-  expected: { outcome: 'DENY at policy', reasonCode: 'ACTION_NOT_IN_SCOPE' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at policy', reasonCode: 'ACTION_NOT_IN_SCOPE' },
   async run() {
     const w = await buildAttackWorld();
     const index = await w.nextRevIndex();
@@ -46,8 +47,9 @@ export const AUTHORITY_002: AttackScenario = {
     const result = await w.gateway.handleTask(await w.task({ taskId: 'atk_action', credentials: [jws] }));
     return {
       outcome: result.effect === 'DENY' ? `DENY at policy (policy=${result.stages.policy})` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
   },
 };
@@ -57,7 +59,7 @@ export const AUTHORITY_003: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Resource escalation: request outside the delegated resource pattern',
-  expected: { outcome: 'DENY at policy', reasonCode: 'RESOURCE_NOT_IN_SCOPE' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at policy', reasonCode: 'RESOURCE_NOT_IN_SCOPE' },
   async run() {
     const w = await buildAttackWorld();
     // Properly SIGNED for an out-of-scope resource — the policy denies on
@@ -66,8 +68,9 @@ export const AUTHORITY_003: AttackScenario = {
     const result = await w.gateway.handleTask(request);
     return {
       outcome: result.effect === 'DENY' ? `DENY at policy` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
   },
 };
@@ -77,7 +80,7 @@ export const AUTHORITY_004: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Audience escalation: delegation bound to RefundAgent, used against another service',
-  expected: { outcome: 'DENY at policy', reasonCode: 'AUDIENCE_MISMATCH' },
+  expected: { verdict: 'DENIED', outcome: 'DENY at policy', reasonCode: 'AUDIENCE_MISMATCH' },
   async run() {
     const w = await buildAttackWorld();
     // Delegation delegates to RefundAgent; the request targets evil.
@@ -97,8 +100,9 @@ export const AUTHORITY_004: AttackScenario = {
     const result = await w.gateway.handleTask(request);
     return {
       outcome: result.effect === 'DENY' ? `DENY at policy` : result.outcome,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total },
+      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
     };
   },
 };
@@ -108,9 +112,8 @@ export const AUTHORITY_005: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Child delegation broadens parent authority (attenuation walker)',
-  expected: { outcome: 'delegation walker denies before policy', reasonCode: 'DELEGATION_ACTION_ESCALATION' },
+  expected: { verdict: 'REFUSED', outcome: 'delegation walker rejects the broadened child (the gateway composes the walker before policy; it accepts a single delegation link, so the walker is exercised directly)', reasonCode: 'DELEGATION_ACTION_ESCALATION' },
   async run() {
-    const w = await buildAttackWorld();
     // The gateway feeds VERIFIED credentials into validateDelegationChain;
     // every signature on such a chain can be perfectly valid — attenuation
     // is the control that catches a broadened child.
@@ -128,12 +131,17 @@ export const AUTHORITY_005: AttackScenario = {
       validUntil: NOW + 86_400,
     };
     const result = validateDelegationChain([parent, child]);
+    // Control: the SAME chain with a properly attenuated child is accepted, so the
+    // rejection above is caused by the broadening and not by a broken fixture.
+    const attenuated = { ...child, authority: { ...child.authority, actions: ['refund:create'] } };
+    const control = validateDelegationChain([parent, attenuated]);
     return {
       outcome: !result.ok
         ? `broadened child rejected by the walker (${result.reasonCodes.join(', ')})`
         : 'UNEXPECTED: broadening accepted',
+      verdict: !result.ok ? 'REFUSED' : 'BREACHED',
       reasonCodes: result.ok ? [] : result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
+      invariants: { walkerRejected: !result.ok, controlAttenuatedChainAccepted: control.ok === true },
     };
   },
 };
@@ -143,9 +151,8 @@ export const AUTHORITY_006: AttackScenario = {
   category: 'AUTHORITY',
   kind: 'ATTACK',
   title: 'Delegation depth escalation beyond remaining budget (attenuation walker)',
-  expected: { outcome: 'attenuation denies before policy', reasonCode: 'DELEGATION_DEPTH_EXCEEDED' },
+  expected: { verdict: 'REFUSED', outcome: 'attenuation walker rejects a depth beyond the remaining budget (exercised directly: the gateway accepts a single delegation link)', reasonCode: 'DELEGATION_DEPTH_EXCEEDED' },
   async run() {
-    const w = await buildAttackWorld();
     const { validateDelegationChain } = await import('@agent-trust/delegation');
     // Leaf parent with ZERO budget; forged child claims one more hop.
     const parent = {
@@ -161,12 +168,18 @@ export const AUTHORITY_006: AttackScenario = {
       validUntil: NOW + 86_400,
     };
     const result = validateDelegationChain([parent, child]);
+    // Control: with a parent that DOES have budget (depth 1) and a leaf child (depth 0) the chain is accepted.
+    const control = validateDelegationChain([
+      { ...parent, authority: { ...parent.authority, delegationDepth: 1 } },
+      { ...child, authority: { ...child.authority, delegationDepth: 0 } },
+    ]);
     return {
       outcome: !result.ok
         ? `depth budget enforced (${result.reasonCodes.join(', ')})`
         : 'UNEXPECTED: depth escalation accepted',
+      verdict: !result.ok ? 'REFUSED' : 'BREACHED',
       reasonCodes: result.ok ? [] : result.reasonCodes,
-      invariants: { executorCalls: w.executor.callCount.total, policyCalls: w.policyCalls.n },
+      invariants: { walkerRejected: !result.ok, controlWithinBudgetChainAccepted: control.ok === true },
     };
   },
 };

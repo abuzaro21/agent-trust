@@ -28,9 +28,14 @@ export const ATTEST_001: AttackScenario = {
   category: 'ATTESTATION',
   kind: 'ATTACK',
   title: 'Fake vouch from an untrusted issuer (signature may be valid)',
-  expected: { outcome: 'attestation rejected; authority unchanged' },
+  expected: { verdict: 'REFUSED', outcome: 'attestation rejected; authority unchanged', reasonCode: 'UNTRUSTED_ISSUER' },
   async run() {
     const w = await buildAttackWorld();
+    // Control: a vouch from a TRUSTED issuer is accepted in the very same profile, so the rejection of the
+    // evil vouch is about its issuer and not about a broken fixture.
+    w.attestationTrust.trust('did:web:audit.acme.example:auditor', 'CAPABILITY_ENDORSEMENT');
+    const good = await issueAttestation(w);
+    w.attestationStore.add('did:web:trust.example.com:agents:support', good.jws);
     const { jws } = await issueAttestation(w, { issuer: 'evil' });
     w.attestationStore.add('did:web:trust.example.com:agents:support', jws);
     w.agentCredentialStore.add('did:web:trust.example.com:agents:support', w.delegationJws);
@@ -38,11 +43,16 @@ export const ATTEST_001: AttackScenario = {
     const profile = await profileService(w, cp).build('did:web:trust.example.com:agents:support', { now: NOW });
     return {
       outcome:
-        profile.attestations.trusted.length === 0 && profile.attestations.rejected.length === 1
-          ? `vouch rejected (${profile.attestations.rejected[0]?.reasonCodes.join(',')}); authority unchanged`
+        profile.attestations.trusted.length === 1 && profile.attestations.rejected.length === 1
+          ? `untrusted vouch rejected (${profile.attestations.rejected[0]?.reasonCodes.join(',')}); trusted-issuer control accepted; authority unchanged`
           : 'UNEXPECTED trust change',
+      verdict: profile.attestations.rejected.length === 1 && profile.attestations.trusted.length === 1 ? 'REFUSED' : 'BREACHED',
       reasonCodes: profile.attestations.rejected[0]?.reasonCodes ?? [],
-      invariants: { victimAuthorityCount: profile.authority.active.length, victimTrustedAttestations: profile.attestations.trusted.length },
+      invariants: {
+        victimAuthorityCount: profile.authority.active.length,
+        controlTrustedAttestations: profile.attestations.trusted.length,
+        untrustedRejected: profile.attestations.rejected.length,
+      },
     };
   },
 };
@@ -52,7 +62,7 @@ export const ATTEST_002: AttackScenario = {
   category: 'ATTESTATION',
   kind: 'ATTACK',
   title: '100 Sybil vouches — count is not trust',
-  expected: { outcome: 'trusted attestations = 0; authority unchanged; policy unchanged' },
+  expected: { verdict: 'CONTAINED', outcome: 'trusted attestations = 0; authority unchanged; policy unchanged', reasonCode: 'AUTHORITY_LIMIT_EXCEEDED' },
   async run() {
     const w = await buildAttackWorld();
     // Grant SOME trust in the world (just not to the Sybils).
@@ -80,8 +90,10 @@ export const ATTEST_002: AttackScenario = {
     const over = await w.gateway.handleTask(await w.task({ amount: 5000, taskId: 'atk_sybil_over' }));
     return {
       outcome: `trusted=${profile.attestations.trusted.length} rejected=${profile.attestations.rejected.length}; 5000 SAR → ${over.effect}`,
+      verdict: profile.attestations.trusted.length === 0 && over.effect === 'DENY' ? 'CONTAINED' : 'BREACHED',
       reasonCodes: over.reasonCodes,
       invariants: {
+        policyDeniedOverLimit: over.effect === 'DENY',
         victimAuthorityCount: profile.authority.active.length,
         victimTrustedAttestations: profile.attestations.trusted.length,
         sybilRejected: profile.attestations.rejected.length,
@@ -95,7 +107,7 @@ export const ATTEST_003: AttackScenario = {
   category: 'ATTESTATION',
   kind: 'ATTACK',
   title: 'Trusted attestations but NO delegation credential — gateway must still deny',
-  expected: { outcome: 'DENY — vouch ≠ authority', reasonCode: 'REQUEST_MALFORMED' },
+  expected: { verdict: 'DENIED', outcome: 'DENY — vouch ≠ authority', reasonCode: 'REQUEST_MALFORMED' },
   async run() {
     const w = await buildAttackWorld();
     w.attestationTrust
@@ -111,6 +123,7 @@ export const ATTEST_003: AttackScenario = {
     const profile = await profileService(w, cp).build('did:web:trust.example.com:agents:support', { now: NOW });
     return {
       outcome: `gateway=${result.effect} with ${profile.attestations.trusted.length} trusted attestations and NO delegation`,
+      verdict: result.effect === 'DENY' ? 'DENIED' : 'BREACHED',
       reasonCodes: result.reasonCodes,
       invariants: { executorCalls: w.executor.callCount.total, victimTrustedAttestations: profile.attestations.trusted.length },
     };
@@ -122,7 +135,7 @@ export const ATTEST_004: AttackScenario = {
   category: 'ATTESTATION',
   kind: 'ATTACK',
   title: 'Revoked attestation disappears from trusted evidence',
-  expected: { outcome: 'revoked vouch leaves the trusted list (standard credentialStatus)' },
+  expected: { verdict: 'CONTAINED', outcome: 'revoked vouch leaves the trusted list (standard credentialStatus)', reasonCode: 'CREDENTIAL_REVOKED' },
   async run() {
     const w = await buildAttackWorld();
     w.attestationTrust.trust('did:web:audit.acme.example:auditor', 'CAPABILITY_ENDORSEMENT');
@@ -138,8 +151,9 @@ export const ATTEST_004: AttackScenario = {
       outcome: trustedBefore === 1 && p1.attestations.trusted.length === 0
         ? `trusted ${trustedBefore} → ${p1.attestations.trusted.length} after revocation (${p1.attestations.rejected[0]?.reasonCodes.join(',')})`
         : 'UNEXPECTED',
+      verdict: trustedBefore === 1 && p1.attestations.trusted.length === 0 ? 'CONTAINED' : 'BREACHED',
       reasonCodes: p1.attestations.rejected[0]?.reasonCodes ?? [],
-      invariants: { victimTrustedAttestations: p1.attestations.trusted.length },
+      invariants: { trustedBefore, victimTrustedAttestations: p1.attestations.trusted.length },
     };
   },
 };
@@ -149,21 +163,25 @@ export const ATTEST_005: AttackScenario = {
   category: 'ATTESTATION',
   kind: 'ATTACK',
   title: 'Attestation for the wrong subject cannot attach to the victim',
-  expected: { outcome: 'WRONG_SUBJECT — rejected, victim unaffected' },
+  expected: { verdict: 'REFUSED', outcome: 'WRONG_SUBJECT — rejected, victim unaffected', reasonCode: 'WRONG_SUBJECT' },
   async run() {
     const w = await buildAttackWorld();
     w.attestationTrust.trust('did:web:audit.acme.example:auditor', 'CAPABILITY_ENDORSEMENT');
+    // Control: a correctly addressed vouch from the same trusted issuer is accepted in the same profile.
+    const good = await issueAttestation(w);
+    w.attestationStore.add('did:web:trust.example.com:agents:support', good.jws);
     const { jws } = await issueAttestation(w, { subject: 'did:web:evil.example:agent' });
     w.attestationStore.add('did:web:trust.example.com:agents:support', jws);
     const cp = await anchorCheckpoint(w);
     const profile = await profileService(w, cp).build('did:web:trust.example.com:agents:support', { now: NOW });
     return {
       outcome:
-        profile.attestations.trusted.length === 0 && profile.attestations.rejected.length === 1
-          ? `wrong-subject vouch rejected (${profile.attestations.rejected[0]?.reasonCodes.join(',')})`
+        profile.attestations.trusted.length === 1 && profile.attestations.rejected.length === 1
+          ? `wrong-subject vouch rejected (${profile.attestations.rejected[0]?.reasonCodes.join(',')}); correctly addressed control accepted`
           : 'UNEXPECTED',
+      verdict: profile.attestations.trusted.length === 1 && profile.attestations.rejected.length === 1 ? 'REFUSED' : 'BREACHED',
       reasonCodes: profile.attestations.rejected[0]?.reasonCodes ?? [],
-      invariants: { victimTrustedAttestations: profile.attestations.trusted.length },
+      invariants: { controlTrustedAttestations: profile.attestations.trusted.length, wrongSubjectRejected: profile.attestations.rejected.length },
     };
   },
 };
