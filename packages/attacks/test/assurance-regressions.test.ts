@@ -269,3 +269,54 @@ describe('mutation-found gaps, now closed (each facet isolates ONE defence)', ()
     expect(INVARIANT_CHECKS['ATTEST-001']!({ ...o, invariants: { ...o.invariants, rejectedReasons: ['UNTRUSTED_ISSUER'] } }).ok).toBe(false);
   });
 });
+
+describe('audit-review findings (second independent audit), now closed', () => {
+  it('DIDWEB-007 drives the REAL transport: declared length and streamed bytes are both capped, a below-limit body is served', async () => {
+    const o = await observe('DIDWEB-007');
+    expect(o.invariants).toMatchObject({ declaredLengthCap: 'TOO_LARGE', streamedBytesCap: 'TOO_LARGE', belowLimitControl: 'OK', controlResolves: true });
+    const check = INVARIANT_CHECKS['DIDWEB-007']!;
+    for (const key of ['declaredLengthCap', 'streamedBytesCap']) {
+      expect(check({ ...o, invariants: { ...o.invariants, [key]: 'OK' } }).ok, key).toBe(false); // the cap was not enforced
+    }
+    expect(check({ ...o, invariants: { ...o.invariants, belowLimitControl: 'TOO_LARGE' } }).ok).toBe(false);
+  });
+
+  it('DIDWEB-005 proves pinning: ONE lookup, and the connection primitive receives the validated (first) address', async () => {
+    const o = await observe('DIDWEB-005');
+    expect(o.invariants).toMatchObject({ lookupsForOneRequest: 1, connectedAddresses: ['93.184.216.34'], connectAttempts: 0, transportErrorCode: 'POLICY' });
+    const check = INVARIANT_CHECKS['DIDWEB-005']!;
+    expect(check({ ...o, invariants: { ...o.invariants, lookupsForOneRequest: 2 } }).ok).toBe(false); // a second lookup = rebinding window
+    expect(check({ ...o, invariants: { ...o.invariants, connectedAddresses: ['10.0.0.5'] } }).ok).toBe(false); // connected to the rebound address
+  });
+
+  it('INFRA-002 requires BOTH receipts to exist and be linked (undefined === undefined no longer passes)', async () => {
+    const o = await observe('INFRA-002');
+    expect(o.invariants).toMatchObject({ decisionReceiptEffect: 'ALLOW', outcomeState: 'FAILED', decisionAndOutcomeChained: true });
+    const check = INVARIANT_CHECKS['INFRA-002']!;
+    expect(check({ ...o, invariants: { ...o.invariants, decisionReceiptEffect: null } }).ok).toBe(false);
+    expect(check({ ...o, invariants: { ...o.invariants, decisionAndOutcomeChained: false } }).ok).toBe(false);
+    expect(o.reasonCodes).toContain('WITHIN_SCOPE');
+  });
+
+  it('AUDIT-001..008: the consumer must SUPPRESS history, not merely flag verified=false', async () => {
+    for (let n = 1; n <= 8; n++) {
+      const id = `AUDIT-00${n}`;
+      const o = await observe(id);
+      expect(o.invariants, id).toMatchObject({ consumerHistoryVerified: false, consumerHistoryEmpty: true, controlConsumerHistoryVerified: true });
+      expect(INVARIANT_CHECKS[id]!({ ...o, invariants: { ...o.invariants, consumerHistoryEmpty: false } }).ok, id).toBe(false);
+    }
+  });
+
+  it('typed transport cause is pinned for the SSRF scenarios (DID-Core / transport errors, not just "some error")', async () => {
+    for (const id of ['DIDWEB-002', 'DIDWEB-003', 'DIDWEB-004', 'DIDWEB-005']) {
+      const o = await observe(id);
+      expect(o.invariants.transportErrorCode, id).toBe('POLICY');
+      expect(INVARIANT_CHECKS[id]!({ ...o, invariants: { ...o.invariants, transportErrorCode: 'NETWORK' } }).ok, id).toBe(false);
+    }
+    for (const [id, err] of [['DIDWEB-001', 'invalidDid'], ['DIDWEB-006', 'internalError'], ['DIDWEB-007', 'internalError'], ['DIDWEB-008', 'invalidDid'], ['DIDWEB-009', 'invalidDid']] as const) {
+      const o = await observe(id);
+      expect(o.invariants.resolutionError, id).toBe(err);
+      expect(INVARIANT_CHECKS[id]!({ ...o, invariants: { ...o.invariants, resolutionError: 'notFound' } }).ok, id).toBe(false);
+    }
+  });
+});

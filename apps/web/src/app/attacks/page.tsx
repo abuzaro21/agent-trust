@@ -51,7 +51,7 @@ export default function AttacksPage() {
         <section className="hero" style={{ paddingBottom: 0 }}>
           <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Sixty security scenarios, each checked against a typed expected outcome.</h1>
           <p className="lead">
-            Every scenario declares an expected outcome class and is judged on machine-checked invariants — for example that the executor and policy never ran on a denial, that a corrupted policy bundle never produces an engine, and that untouched audit history verifies before it is tampered with. 48 also require a specific reason code; the other 12 (did:web resolver errors and one allowed-then-failed execution) record why they have none. A scenario fails if its checker or evidence is missing.
+            Every scenario declares an expected outcome class and is judged on machine-checked invariants — for example that the executor and policy never ran on a denial, that a corrupted policy bundle never produces an engine, and that untouched audit history verifies before it is tampered with. 49 also require a specific reason code; the other 11 (did:web resolver and transport errors) record why they have none. A scenario fails if its checker or evidence is missing.
             </p>
         </section>
 

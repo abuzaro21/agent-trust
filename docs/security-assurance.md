@@ -14,7 +14,7 @@ A scenario passes only if **all** of these hold (`packages/attacks/src/oracle.ts
 4. A registered invariant checker exists and accepts the recorded evidence. Missing checker, missing invariant key, wrong type, or an exception all fail. Checkers use strict helpers (`requireInvariants`, `requireAtLeast`) — a key the scenario forgot to record can never satisfy a check.
 5. The human-readable outcome text contains no failure marker. This is defence in depth only; the text is never the oracle.
 
-The 12 scenarios without a reason code are `DIDWEB-001…011` (the resolver reports DID-Core `didResolutionMetadata.error` values, and the transport a typed `DidWebTransportError`, not gateway reason codes) and `INFRA-002` (an `ALLOW` decision whose execution `FAILED`; the oracle is the typed decision/outcome state). The list is pinned by a test.
+The 11 scenarios without a reason code are `DIDWEB-001…011` (the resolver reports DID-Core `didResolutionMetadata.error` values and the transport a typed `DidWebTransportError`, not gateway reason codes). Their checkers pin that typed cause (for example `invalidDid`, `internalError`, `TOO_LARGE`, `POLICY`), so "some error" is not enough; `DIDWEB-011` is a freshness property with no failure at all. The list is pinned by a test.
 
 ## What was weak, and what changed
 
@@ -22,7 +22,7 @@ The 12 scenarios without a reason code are `DIDWEB-001…011` (the resolver repo
 |---|---|---|
 | PASS rule | Reason match **and** a regex over the scenario's own outcome string **and** a checker; a missing checker passed, no reason spec passed | Typed verdict + one reason policy + checker + marker scan; every missing piece fails |
 | `STATUS-004`, `POLICY-002` | Checker was unconditional (`() => ({ok:true})`); 58 of 60 asserted invariants | All 60 assert invariants; `STATUS-004` asserts `executorCalls === 0`, `policyCalls === 0`, credential stage `FAIL` |
-| Reason codes asserted | 31 of 60 | 48 of 60 (12 documented exceptions) |
+| Reason codes asserted | 31 of 60 | 49 of 60 (11 documented exceptions, typed cause pinned instead) |
 | `POLICY-001/002` | Manifests failed the **shape** gate, so the digest gate was never reached | Real manifest with a tampered digest → `hash_mismatch`; self-consistent garbage module → instantiation failure; control: the genuine artifact loads; assertion: no engine is obtainable. No executor counter is invented (nothing executes at load). |
 | `AUDIT-*` | Checkpoint id `ckpt_au` is 7 characters (schema minimum 8): the checkpoint half was rejected for a **malformed payload**, never reaching the tamper comparison | Valid fixture; every audit scenario proves the untouched history verifies (chain, signed checkpoint, and the trust-profile consumer) before tampering |
 | `POLICY-004` | Fixture also had empty `credential.types`, so it was invalid with or without the score | Control: same facts without the score validate; with it, invalid only for the extra property |
@@ -54,17 +54,19 @@ A mutation sweep proves these specific defences are exercised; it is not a proof
 
 ## Verification record (this branch)
 
-Typecheck clean; 637 unit/property tests pass (50 files, includes 117 new `packages/attacks` tests: oracle negative controls, registry integrity, per-scenario mutation of recorded evidence, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
+Typecheck clean; 652 unit/property tests pass (51 files, including 132 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
 
-## Open items from the independent audit (NOT yet fixed on this branch)
+## Independent audit and its resolution
 
-A fresh read-only audit (Codex GPT-6.1 Sol) of commits `e91b367`..`4cd2c9b` found six assurance gaps and no changed security implementation. Each came with an executed negative control. Until these are fixed, the statements above should be read with them:
+A fresh read-only audit (Codex GPT-6.1 Sol) of the first two commits found six assurance gaps and no changed security implementation. Each came with an executed negative control; all six were fixed and each control was re-run as a real product mutant:
 
-- **P1** `DIDWEB-007` injects a `TOO_LARGE` error from a test double instead of sending oversized bytes through the real transport. Removing both size-cap checks in `did-web-transport.ts` left the suite green.
-- **P1** `DIDWEB-005` tests private-address classification, not DNS-rebinding pinning. Changing the default request to connect by hostname left the suite green.
-- **P2** `INFRA-002` can pass with `undefined === undefined` decision links.
-- **P2** `AUDIT-001..008` read only `history.integrity.verified`, not that the consumer returns empty history.
-- **P2** `requireInvariants` compares JSON text (`toJSON`, `NaN`/`null`, key-order quirks); `allOf()` and an empty expectation pass vacuously; `judge()` propagates a throwing checker.
-- **P2** The registry mutation test accepts a checker that ignores most recorded evidence; each asserted key needs an independent violation test.
+| Finding | Fix | Re-run as product mutant |
+|---|---|---|
+| P1 `DIDWEB-007` injected the `TOO_LARGE` error from a double | Drives the **real** streaming transport: declared `content-length` and streamed bytes both capped, below-limit control served, end-to-end through the resolver | Removing either or both size caps: killed (`DIDWEB-007`, vitest) |
+| P1 `DIDWEB-005` tested classification, not pinning | Scenario records one DNS lookup and the validated address reaching the connection primitive; a vitest case inspects the default `https.get` options (`host` = validated IP, SNI = hostname, pinned `lookup`) | Connect-by-hostname, wrong lookup answer, second lookup: killed |
+| P2 `INFRA-002` passed on `undefined === undefined` | Both receipts must be found in the chain by id, linked, ordered; now also requires `WITHIN_SCOPE` | covered by per-key tests |
+| P2 `AUDIT-001..008` read only `verified` | Also record that the consumer's history is empty; control: untouched history is served | Consumer serving history while `verified=false`: killed (`AUDIT-001…008`) |
+| P2 `requireInvariants` compared JSON text; empty combinators passed | Structural strict equality (rejects `toJSON`, `NaN`, `undefined`, class instances); empty expectation and `allOf()` fail; a throwing checker is a FAIL | unit tests |
+| P2 per-scenario mutation test too weak | Evidence is a declarative table; **every asserted key** is independently deleted and corrupted and must be rejected; a recorded key that is neither asserted nor listed informational fails | registry test |
 
-The planned fixes are: drive the real transport with oversized and chunked responses, plus a socket-level pinning test and a second-resolution rebinding control. Then make the checks structural and strict, declare asserted and informational keys per scenario, and update the "48 of 60 / 12 exceptions" counts if `INFRA-002` gains a reason code.
+Two mutants remain subsumed rather than killed (see above), and Codex agreed they are redundant under current contracts. Codex also confirmed that no trust-consuming path relies on checkpoint comparison alone.

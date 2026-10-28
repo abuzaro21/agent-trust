@@ -54,7 +54,7 @@ Failure-thinking summary: 60/60 deterministic adversarial scenarios
                       credentials, authority, status, replay, policy,
                       audit, attestation, did:web transport, and
                       infrastructure — each judged on a typed expected outcome and
-                      machine-checked invariants, 48 of 60 also on a specific reason code
+                      machine-checked invariants, 49 of 60 also on a specific reason code
                       (the executor really did not run; a spoof is never
                       attributed to the victim); POLICY-002 and STATUS-004
                       do not assert one.

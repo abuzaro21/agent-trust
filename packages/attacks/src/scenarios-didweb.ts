@@ -85,7 +85,7 @@ export const DIDWEB_002: AttackScenario = {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
         verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects() },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -112,7 +112,7 @@ export const DIDWEB_003: AttackScenario = {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
         verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects() },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -139,7 +139,7 @@ export const DIDWEB_004: AttackScenario = {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `blocked pre-connect (${e.message})` : String(e),
         verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects() },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null },
       };
     }
   },
@@ -160,15 +160,30 @@ export const DIDWEB_005: AttackScenario = {
       dnsLookup: async () => [{ address: '192.168.0.7', family: 4 }],
       httpRequest: async () => { connectAttempts += 1; throw new Error('MUST NOT CONNECT'); },
     });
+    // Pinning: DNS answers a PUBLIC address on the first lookup and a PRIVATE one on any later lookup (the rebinding
+    // race). The transport must resolve ONCE and hand the validated address to the connection primitive.
+    let lookups = 0;
+    const connectedTo: string[] = [];
+    const pinning = new NodeHttpsDidWebClient({
+      dnsLookup: async () => {
+        lookups += 1;
+        return lookups === 1 ? [{ address: '93.184.216.34', family: 4 }] : [{ address: '10.0.0.5', family: 4 }];
+      },
+      httpRequest: async (input) => {
+        connectedTo.push(input.connectionAddress);
+        return { status: 200, headers: {}, streamBody: null };
+      },
+    });
+    await pinning.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
     try {
       await client.get(new URL(`https://${HOST}/did.json`), { timeoutMs: 1000, maxBytes: 1024 });
-      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false } };
+      return { outcome: 'UNDETECTED — connected', verdict: 'BREACHED', reasonCodes: [], invariants: { blockedPreConnect: false, connectAttempts, controlPublicAddressConnects: false, lookupsForOneRequest: lookups, connectedAddresses: connectedTo, transportErrorCode: null } };
     } catch (e) {
       return {
         outcome: e instanceof DidWebTransportError && e.code === 'POLICY' ? `rebinding blocked (${e.message})` : String(e),
         verdict: e instanceof DidWebTransportError && e.code === 'POLICY' ? 'REFUSED' : 'BREACHED',
         reasonCodes: [],
-        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects() },
+        invariants: { blockedPreConnect: e instanceof DidWebTransportError && e.code === 'POLICY', connectAttempts, controlPublicAddressConnects: await publicAddressConnects(), transportErrorCode: e instanceof DidWebTransportError ? e.code : null, lookupsForOneRequest: lookups, connectedAddresses: connectedTo },
       };
     }
   },
@@ -205,23 +220,51 @@ export const DIDWEB_007: AttackScenario = {
   category: 'DID_WEB',
   kind: 'ATTACK',
   title: 'Oversized document response',
-  expected: { verdict: 'REFUSED', outcome: 'transport TOO_LARGE, deterministic failure', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error, not a gateway ReasonCode' },
+  expected: { verdict: 'REFUSED', outcome: 'the real transport enforces its byte cap (declared length and streamed bytes); resolution fails deterministically', noReasonCode: 'the did:web resolver reports a DID-Core didResolutionMetadata.error and the transport a typed TOO_LARGE error, not a gateway ReasonCode' },
   async run() {
-    const { WebDidResolver, DidWebTransportError } = await import('@agent-trust/did');
-    const resolver = new WebDidResolver({
-      clock: () => 1_000_000,
-      http: {
-        get: async () => {
-          throw new DidWebTransportError('TOO_LARGE', 'response exceeds cap 262144 bytes');
-        },
-      },
-    });
-    const r = await resolver.resolve(DID);
+    const { NodeHttpsDidWebClient, DidWebTransportError, WebDidResolver } = await import('@agent-trust/did');
+    const url = new URL(`https://${HOST}/agents/support/did.json`);
+    // The REAL streaming transport, with only DNS and the request primitive faked (no network).
+    async function* stream(sizes: number[]) {
+      for (const n of sizes) yield new Uint8Array(n).fill(0x20);
+    }
+    const client = (headers: Record<string, string>, body: AsyncIterable<Uint8Array> | null) =>
+      new NodeHttpsDidWebClient({
+        dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+        httpRequest: async () => ({ status: 200, headers, streamBody: body }),
+      });
+    const outcome = async (c: InstanceType<typeof NodeHttpsDidWebClient>, maxBytes: number): Promise<string> => {
+      try {
+        await c.get(url, { timeoutMs: 1000, maxBytes });
+        return 'OK';
+      } catch (e) {
+        return e instanceof DidWebTransportError ? e.code : 'OTHER';
+      }
+    };
+    const declaredLength = await outcome(client({ 'content-length': '2048' }, null), 1024);
+    const streamed = await outcome(client({}, stream([600, 600])), 1024);
+    const belowLimit = await outcome(client({ 'content-length': '500' }, stream([500])), 1024);
+
+    // End to end: the resolver over the real transport refuses an oversized document and caches nothing...
+    const big = new WebDidResolver({ http: client({}, stream([150_000, 150_000])), clock: () => 1_000_000 });
+    const r = await big.resolve(DID);
+    // ...and the same resolver + transport serves a normal-sized document (control).
+    const doc = new TextEncoder().encode(JSON.stringify(GOOD_DOC));
+    const ok = new WebDidResolver({ http: client({}, (async function* () { yield doc; })()), clock: () => 1_000_000 });
+    const control = await ok.resolve(DID);
+    const refused = r.didDocument === null && declaredLength === 'TOO_LARGE' && streamed === 'TOO_LARGE';
     return {
-      outcome: r.didDocument === null ? `size-capped (${r.didResolutionMetadata.message})` : 'UNDETECTED',
-      verdict: r.didDocument === null ? 'REFUSED' : 'BREACHED',
+      outcome: refused ? `size-capped by the real transport (${r.didResolutionMetadata.message})` : 'UNDETECTED',
+      verdict: refused ? 'REFUSED' : 'BREACHED',
       reasonCodes: [],
-      invariants: { controlResolves: await controlResolves(), resolutionError: r.didResolutionMetadata.error ?? null, notCached: resolver.peekCache(DID) === undefined },
+      invariants: {
+        declaredLengthCap: declaredLength,
+        streamedBytesCap: streamed,
+        belowLimitControl: belowLimit,
+        controlResolves: control.didDocument !== null && control.didDocument.id === DID,
+        resolutionError: r.didResolutionMetadata.error ?? null,
+        notCached: big.peekCache(DID) === undefined,
+      },
     };
   },
 };

@@ -40,23 +40,30 @@ export const INFRA_002: AttackScenario = {
   category: 'INFRASTRUCTURE',
   kind: 'FAILURE_DEMO',
   title: 'Executor fails after a legitimate ALLOW — honest FAILED outcome receipt',
-  expected: { verdict: 'FAILED_SAFE', outcome: 'ALLOW decision preserved; execution outcome is FAILED (never faked as success)', noReasonCode: 'the decision is an ALLOW (it carries allow reasons); the property under test is the typed FAILED execution state, asserted in the invariants' },
+  expected: { verdict: 'FAILED_SAFE', outcome: 'ALLOW decision preserved; execution outcome is FAILED (never faked as success)', reasonCode: 'WITHIN_SCOPE' },
   async run() {
     const w = await buildAttackWorld();
     const failing = new (await import('../../gateway/src/executor.js')).DemoRefundExecutor({ failTaskIds: ['atk_exec_fail'] });
     const gateway = new (await import('../../gateway/src/gateway.js')).TrustGateway({ ...w.gatewayDeps, executor: failing });
     const result = await gateway.handleTask(await w.task({ taskId: 'atk_exec_fail' }));
     const chain = await w.auditLog.readStream(STREAM);
-    const outcome = chain.find((r) => r.body.receiptId === result.executionReceiptId);
+    // Both receipts must be FOUND in the chain by id (an absent id never matches anything).
+    const decision = result.decisionReceiptId === undefined ? undefined : chain.find((r) => r.body.receiptId === result.decisionReceiptId);
+    const outcome = result.executionReceiptId === undefined ? undefined : chain.find((r) => r.body.receiptId === result.executionReceiptId);
+    const chained =
+      decision !== undefined &&
+      outcome !== undefined &&
+      outcome.body.correlation?.decisionReceiptId === decision.body.receiptId &&
+      outcome.body.sequence > decision.body.sequence;
     return {
       outcome: `decision=${result.effect}, execution=${result.stages.execution}, outcome receipt=${outcome?.body.execution?.state}`,
-      verdict: result.effect === 'ALLOW' && outcome?.body.execution?.state === 'FAILED' ? 'FAILED_SAFE' : 'BREACHED',
-      reasonCodes: [],
+      verdict: result.effect === 'ALLOW' && outcome?.body.execution?.state === 'FAILED' && chained ? 'FAILED_SAFE' : 'BREACHED',
+      reasonCodes: result.reasonCodes,
       invariants: {
         decisionEffect: result.effect,
-        outcomeState: outcome?.body.execution?.state,
-        decisionAndOutcomeChained:
-          outcome?.body.correlation?.decisionReceiptId === result.decisionReceiptId,
+        decisionReceiptEffect: decision?.body.decision.effect ?? null,
+        outcomeState: outcome?.body.execution?.state ?? null,
+        decisionAndOutcomeChained: chained,
       },
     };
   },

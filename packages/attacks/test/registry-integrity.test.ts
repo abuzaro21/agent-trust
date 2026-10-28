@@ -2,7 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   ATTACK_REGISTRY,
+  EVIDENCE_SPEC,
   INVARIANT_CHECKS,
+  assertedKeys,
   judge,
   runAttackSuite,
   type AttackObserved,
@@ -20,10 +22,9 @@ beforeAll(async () => {
   report = await runAttackSuite();
 }, 120_000);
 
-/** Scenarios that legitimately have no gateway ReasonCode to assert, with the reason recorded in the registry. */
+/** Scenarios that legitimately have no gateway ReasonCode to assert (the did:web resolver speaks DID-Core errors), with the reason recorded in the registry. */
 const INTENTIONAL_NO_REASON_CODE = [
   'DIDWEB-001', 'DIDWEB-002', 'DIDWEB-003', 'DIDWEB-004', 'DIDWEB-005', 'DIDWEB-006', 'DIDWEB-007', 'DIDWEB-008', 'DIDWEB-009', 'DIDWEB-010', 'DIDWEB-011',
-  'INFRA-002',
 ];
 
 describe('registry structure', () => {
@@ -53,8 +54,8 @@ describe('registry structure', () => {
     const optedOut = ATTACK_REGISTRY.filter((s) => s.expected.noReasonCode !== undefined);
     expect(optedOut.map((s) => s.id).sort()).toEqual([...INTENTIONAL_NO_REASON_CODE].sort());
     for (const s of optedOut) expect(s.expected.noReasonCode!.trim().length, `${s.id} justification`).toBeGreaterThan(20);
-    // 48 of 60 assert a concrete reason code; 12 are the documented exceptions above.
-    expect(ATTACK_REGISTRY.length - optedOut.length).toBe(48);
+    // 49 of 60 assert a concrete reason code; 11 are the documented exceptions above.
+    expect(ATTACK_REGISTRY.length - optedOut.length).toBe(49);
   });
 });
 
@@ -64,6 +65,15 @@ describe('no checker passes by default', () => {
   it.each(ATTACK_REGISTRY.map((s) => s.id))('%s: its invariant checker REJECTS an empty observation', (id) => {
     const verdict = INVARIANT_CHECKS[id]!(empty);
     expect(verdict.ok, `${id} accepted an observation that recorded nothing`).toBe(false);
+  });
+});
+
+describe('an empty or hollow specification can never pass', () => {
+  it('checkerFor({}) rejects every observation, including a perfect one', async () => {
+    const { checkerFor } = await import('../src/index.js');
+    const good: AttackObserved = { outcome: 'x', verdict: 'DENIED', reasonCodes: [], invariants: { executorCalls: 0 } };
+    expect(checkerFor({})(good).ok).toBe(false);
+    expect(checkerFor({ equals: {} })(good).ok).toBe(false);
   });
 });
 
@@ -85,7 +95,8 @@ describe('the whole suite', () => {
 
 describe('mutation testing: every scenario depends on what it records', () => {
   const sc = (id: string) => ATTACK_REGISTRY.find((s) => s.id === id)!;
-  const mutate = (v: unknown): unknown => (typeof v === 'boolean' ? !v : typeof v === 'number' ? v + 1 : typeof v === 'string' ? `${v}~mutated` : '~mutated');
+  const mutate = (v: unknown, atLeast?: number): unknown =>
+    atLeast !== undefined ? atLeast - 1 : typeof v === 'boolean' ? !v : typeof v === 'number' ? v + 1 : typeof v === 'string' ? `${v}~mutated` : Array.isArray(v) ? [...v, '~mutated'] : v !== null && typeof v === 'object' ? { ...v, '~mutated': true } : '~mutated';
 
   it('flipping the typed verdict to BREACHED fails every scenario', () => {
     for (const r of report.scenarios) {
@@ -103,21 +114,47 @@ describe('mutation testing: every scenario depends on what it records', () => {
     }
   });
 
-  it('each checker rejects at least one single-key deletion AND at least one single-key corruption of its real observation', () => {
+  it('EVERY asserted key is independently required: deleting it, or corrupting it, is rejected', () => {
     for (const r of report.scenarios) {
+      const spec = EVIDENCE_SPEC[r.id]!;
       const check = INVARIANT_CHECKS[r.id]!;
-      const keys = Object.keys(r.observed.invariants);
-      expect(keys.length, `${r.id} records no invariants`).toBeGreaterThan(0);
-      let rejectedDeletions = 0;
-      let rejectedCorruptions = 0;
+      const keys = assertedKeys(spec);
+      expect(keys.length, `${r.id} asserts nothing`).toBeGreaterThan(0);
       for (const k of keys) {
+        expect(Object.prototype.hasOwnProperty.call(r.observed.invariants, k), `${r.id}: asserted key ${k} is not recorded`).toBe(true);
         const without = { ...r.observed.invariants };
         delete without[k];
-        if (!check({ ...r.observed, invariants: without }).ok) rejectedDeletions += 1;
-        if (!check({ ...r.observed, invariants: { ...r.observed.invariants, [k]: mutate(r.observed.invariants[k]) } }).ok) rejectedCorruptions += 1;
+        expect(check({ ...r.observed, invariants: without }).ok, `${r.id}: deleting ${k} is still accepted`).toBe(false);
+        const bent = mutate(r.observed.invariants[k], spec.atLeast?.[k]);
+        expect(check({ ...r.observed, invariants: { ...r.observed.invariants, [k]: bent } }).ok, `${r.id}: corrupting ${k} is still accepted`).toBe(false);
       }
-      expect(rejectedDeletions, `${r.id}: deleting any recorded invariant is still accepted`).toBeGreaterThan(0);
-      expect(rejectedCorruptions, `${r.id}: corrupting any recorded invariant is still accepted`).toBeGreaterThan(0);
+    }
+  });
+
+  it('no scenario records evidence that is silently ignored: every recorded key is asserted or explicitly informational', () => {
+    for (const r of report.scenarios) {
+      const spec = EVIDENCE_SPEC[r.id]!;
+      const known = new Set([...assertedKeys(spec), ...(spec.informational ?? [])]);
+      const ignored = Object.keys(r.observed.invariants).filter((k) => !known.has(k));
+      expect(ignored, `${r.id} records keys nothing checks`).toEqual([]);
+    }
+  });
+
+  it('a checker that ignores most of the recorded evidence is detected (IDENTITY-001 reduced to executorCalls)', () => {
+    // The class of defect the audit demonstrated: the weak checker still satisfies "rejects one deletion, one corruption".
+    const r = report.scenarios.find((x) => x.id === 'IDENTITY-001')!;
+    const weak = (o: AttackObserved) => (o.invariants.executorCalls === 0 ? { ok: true } : { ok: false });
+    const full = assertedKeys(EVIDENCE_SPEC['IDENTITY-001']!);
+    const unprotected = full.filter((k) => {
+      const without = { ...r.observed.invariants };
+      delete without[k];
+      return weak({ ...r.observed, invariants: without }).ok; // still accepted => this key is not independently required
+    });
+    expect(unprotected.length).toBeGreaterThan(0); // the per-key test above would fail such a checker
+    for (const k of full) {
+      const without = { ...r.observed.invariants };
+      delete without[k];
+      expect(INVARIANT_CHECKS['IDENTITY-001']!({ ...r.observed, invariants: without }).ok, k).toBe(false);
     }
   });
 

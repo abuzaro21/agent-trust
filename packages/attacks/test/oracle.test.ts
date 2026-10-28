@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { allOf, judge, requireAtLeast, requireInvariants, type AttackObserved, type AttackScenario } from '../src/index.js';
+import { allOf, judge, requireAtLeast, requireInvariants, strictEqual, type AttackObserved, type AttackScenario } from '../src/index.js';
 
 /**
  * Negative controls for the scenario oracle. Each test hands `judge` a
@@ -135,6 +135,49 @@ describe('requireInvariants / requireAtLeast / allOf — strict, no pass-by-omis
     const r = allOf({ ok: true }, { ok: false, detail: 'a' }, { ok: false, detail: 'b' });
     expect(r.ok).toBe(false);
     expect(r.detail).toBe('a | b');
-    expect(allOf().ok).toBe(true);
+    expect(allOf().ok).toBe(false); // an empty combination would pass vacuously
+  });
+});
+
+describe('strict evidence comparison (no JSON-encoding collisions)', () => {
+  const obs = (invariants: Record<string, unknown>): AttackObserved => ({ ...good, invariants });
+
+  it('rejects a custom toJSON() object posing as a number (the executorCalls forgery)', () => {
+    expect(requireInvariants(obs({ executorCalls: { toJSON: () => 0 } }), { executorCalls: 0 }).ok).toBe(false);
+  });
+
+  it('rejects NaN / Infinity against null or numbers, and undefined against undefined', () => {
+    expect(requireInvariants(obs({ v: Number.NaN }), { v: null }).ok).toBe(false);
+    expect(requireInvariants(obs({ v: Number.POSITIVE_INFINITY }), { v: null }).ok).toBe(false);
+    expect(requireInvariants(obs({ v: undefined }), { v: undefined }).ok).toBe(false);
+    expect(requireAtLeast(obs({ v: Number.NaN }), 'v', 0).ok).toBe(false);
+    expect(requireAtLeast(obs({ v: Number.POSITIVE_INFINITY }), 'v', 0).ok).toBe(false);
+  });
+
+  it('distinguishes {a:1,b:undefined} from {a:1}, and accepts differently ordered keys', () => {
+    expect(strictEqual({ a: 1, b: undefined }, { a: 1 })).toBe(false);
+    expect(strictEqual({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(true);
+    expect(requireInvariants(obs({ h: { allow: 0, deny: 0 } }), { h: { deny: 0, allow: 0 } }).ok).toBe(true);
+  });
+
+  it('compares arrays elementwise and rejects class instances and functions', () => {
+    expect(strictEqual(['a', 'b'], ['a', 'b'])).toBe(true);
+    expect(strictEqual(['a', 'b'], ['b', 'a'])).toBe(false);
+    expect(strictEqual(new Date(0), new Date(0))).toBe(false);
+    expect(strictEqual(() => 0, () => 0)).toBe(false);
+  });
+
+  it('an EMPTY expectation fails instead of passing vacuously', () => {
+    expect(requireInvariants(obs({}), {}).ok).toBe(false);
+    expect(requireInvariants(obs({ executorCalls: 0 }), {}).ok).toBe(false);
+  });
+
+  it('judge() turns a THROWING checker into a FAIL instead of propagating', () => {
+    const throwing = () => {
+      throw new Error('boom');
+    };
+    const j = judge(base(), good, throwing);
+    expect(j.status).toBe('FAIL');
+    expect(j.failures.join()).toMatch(/threw/);
   });
 });

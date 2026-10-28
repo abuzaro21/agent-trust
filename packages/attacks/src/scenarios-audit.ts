@@ -17,7 +17,7 @@ async function consumerHistoryVerified(
   w: Awaited<ReturnType<typeof buildAttackWorld>>,
   cp: Awaited<ReturnType<typeof anchorCheckpoint>>,
   receipts: Awaited<ReturnType<typeof w.auditLog.readStream>>,
-): Promise<boolean> {
+): Promise<{ verified: boolean; historyEmpty: boolean }> {
   const service = new TrustProfileService({
     didResolver: w.gatewayDeps.didResolver,
     verifier: w.gatewayDeps.verifier,
@@ -34,7 +34,8 @@ async function consumerHistoryVerified(
     checkpointSignerDid: 'did:web:trust.example.com:audit',
   });
   const profile = await service.build('did:web:trust.example.com:agents:support', { now: NOW });
-  return profile.history.integrity.verified;
+  // A consumer that merely flags `verified=false` but still serves history would pass a flag-only check: require the history itself to be suppressed.
+  return { verified: profile.history.integrity.verified, historyEmpty: Object.keys(profile.history.byAction).length === 0 };
 }
 
 async function prepare() {
@@ -50,7 +51,9 @@ async function prepare() {
   const controlIntact =
     verifyAuditChain(STREAM, receipts).valid &&
     verifyAuditAgainstCheckpoint({ streamId: STREAM, receipts, checkpoint: cp, checkpointVerified }).valid;
-  const controlConsumerHistoryVerified = await consumerHistoryVerified(w, cp, receipts);
+  const controlConsumer = await consumerHistoryVerified(w, cp, receipts);
+  // Control: for the untouched history the consumer is verified AND actually serves history.
+  const controlConsumerHistoryVerified = controlConsumer.verified && !controlConsumer.historyEmpty;
   return { w, cp, receipts, controlIntact, controlConsumerHistoryVerified };
 }
 
@@ -65,12 +68,13 @@ export const AUDIT_001: AttackScenario = {
     const tampered = structuredClone(receipts);
     (tampered[0]!.body.request as { parameters?: { amount?: number } }).parameters = { amount: 1 };
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? `chain invalid at seq ${chain.firstBrokenSequence}; history consumer fails closed` : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -88,12 +92,13 @@ export const AUDIT_002: AttackScenario = {
     if (allow === undefined) throw new Error('fixture: no ALLOW receipt');
     allow.body.decision.effect = 'DENY';
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? 'mutation detected (chain verifier; history consumer fails closed)' : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -108,12 +113,13 @@ export const AUDIT_003: AttackScenario = {
     const { w, cp, receipts, controlIntact, controlConsumerHistoryVerified } = await prepare();
     const tampered = receipts.filter((_, i) => i !== 1); // drop seq 2
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? `deletion detected at seq ${chain.firstBrokenSequence}; history consumer fails closed` : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -131,12 +137,13 @@ export const AUDIT_004: AttackScenario = {
     tampered[0] = tampered[1]!;
     tampered[1] = tmp;
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? `reorder detected at seq ${chain.firstBrokenSequence}; history consumer fails closed` : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -163,12 +170,13 @@ export const AUDIT_005: AttackScenario = {
     forged.eventHash = computeEventHash(forged.previousHash, forged.body);
     const tampered = [...receipts, forged];
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? `forgery detected at seq ${chain.firstBrokenSequence}; history consumer fails closed` : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -188,12 +196,13 @@ export const AUDIT_006: AttackScenario = {
     const tampered = [...receipts];
     tampered[1] = foreign;
     const chain = verifyAuditChain(STREAM, tampered);
-    const consumerOk = await consumerHistoryVerified(w, cp, tampered);
+    const consumer = await consumerHistoryVerified(w, cp, tampered);
+    const consumerOk = consumer.verified || !consumer.historyEmpty; // true = consumer still trusts / serves history
     return {
       outcome: !chain.valid && !consumerOk ? `foreign stream detected at seq ${chain.firstBrokenSequence}; history consumer fails closed` : 'UNDETECTED',
       verdict: !chain.valid && !consumerOk ? 'DETECTED' : 'BREACHED',
       reasonCodes: chain.valid ? [] : chain.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumerOk },
+      invariants: { controlIntact, controlConsumerHistoryVerified, chainValid: chain.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -225,13 +234,14 @@ export const AUDIT_007: AttackScenario = {
       checkpoint: cp,
       checkpointVerified: await verifyCheckpointSignature({ checkpoint: cp, didResolver: w.gatewayDeps.didResolver }),
     });
+    const consumer = await consumerHistoryVerified(w, cp, rewritten);
     return {
       outcome: !anchored.valid
         ? `coherent rewrite (${rewritten.length} receipts, chain valid) REJECTED by signed checkpoint`
         : 'UNDETECTED — checkpoint accepted the rewrite',
       verdict: !anchored.valid ? 'DETECTED' : 'BREACHED',
       reasonCodes: anchored.valid ? [] : anchored.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, rewrittenChainCoherent: chain.valid, checkpointRejected: !anchored.valid, consumerHistoryVerified: await consumerHistoryVerified(w, cp, rewritten) },
+      invariants: { controlIntact, controlConsumerHistoryVerified, rewrittenChainCoherent: chain.valid, checkpointRejected: !anchored.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
@@ -251,11 +261,12 @@ export const AUDIT_008: AttackScenario = {
       checkpoint: cp,
       checkpointVerified: await verifyCheckpointSignature({ checkpoint: cp, didResolver: w.gatewayDeps.didResolver }),
     });
+    const consumer = await consumerHistoryVerified(w, cp, truncated);
     return {
       outcome: !anchored.valid ? `truncation detected (checkpoint at ${cp.payload.sequence}, chain ends at ${truncated.length})` : 'UNDETECTED',
       verdict: !anchored.valid ? 'DETECTED' : 'BREACHED',
       reasonCodes: anchored.valid ? [] : anchored.reasonCodes,
-      invariants: { controlIntact, controlConsumerHistoryVerified, anchoredValid: anchored.valid, consumerHistoryVerified: await consumerHistoryVerified(w, cp, truncated) },
+      invariants: { controlIntact, controlConsumerHistoryVerified, anchoredValid: anchored.valid, consumerHistoryVerified: consumer.verified, consumerHistoryEmpty: consumer.historyEmpty },
     };
   },
 };
