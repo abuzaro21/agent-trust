@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { AttackReportDto, AttackScenarioDto } from '@/lib/dto';
 
 /**
- * /attacks — the Step 13 adversarial suite rendered from the generated
- * report artifact. The page only reads the snapshot; it never triggers a
- * server-side suite run (the API serves the build-time artifact only).
+ * /attacks — the adversarial suite, rendered from the stored report artifact.
+ * The report is generated when the container image is built; this page only
+ * reads it. It never triggers a server-side run and adds no trust logic.
  */
 
 const SHOWCASE = ['AUTHORITY-001', 'IDENTITY-001', 'STATUS-001', 'REPLAY-001', 'AUDIT-007', 'ATTEST-002'];
@@ -15,10 +15,10 @@ const SHOWCASE = ['AUTHORITY-001', 'IDENTITY-001', 'STATUS-001', 'REPLAY-001', '
 export default function AttacksPage() {
   const [report, setReport] = useState<AttackReportDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>('AUTHORITY-001');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -34,119 +34,124 @@ export default function AttacksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const scenarios = useMemo(() => report?.scenarios ?? [], [report]);
 
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px 64px' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.4rem' }}>Security Tests — Adversarial Suite</h1>
-          <p style={{ color: 'var(--fg-muted)', margin: '6px 0 0' }}>
-            Every scenario asserts the denial reason <em>and</em> that protected side effects never happened.
-          </p>
+    <div className="page">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden>✓</span>
+          <span>Agent Trust · Security tests</span>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <a href="/" className="badge badge--neutral" style={{ textDecoration: 'none' }}>← Trust console</a>
-          <button
-            onClick={() => void load()}
-            disabled={loading}
-            style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid var(--border-strong)', background: 'var(--surface-raised)', color: 'var(--fg)', opacity: loading ? 0.6 : 1 }}
-          >
-            {loading ? 'Loading…' : 'Reload report'}
-          </button>
-        </div>
+        <nav className="nav" aria-label="Page">
+          <a href="/">← Back to the demo</a>
+        </nav>
       </header>
 
-      {error !== null && (
-        <div role="alert" className="card" style={{ marginTop: 16, borderColor: 'rgba(239,68,68,.5)' }}>
-          <span className="mono" style={{ color: 'var(--deny)' }}>{error}</span>
+      <main id="main">
+        <section className="hero" style={{ paddingBottom: 0 }}>
+          <h1 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', maxWidth: '22ch' }}>Every attack is checked twice.</h1>
+          <p className="lead">
+            Each scenario asserts the denial reason <strong>and</strong> that the protected action never happened (the executor never ran; a spoof is never attributed to its victim).
+          </p>
+        </section>
+
+        <div className="callout" style={{ marginTop: 'var(--s5)' }}>
+          <strong>About this report:</strong> it was generated when the container image was built and is served as a stored file. It did not run when you opened this page. To reproduce it, run{' '}
+          <code className="mono">pnpm test:attacks</code> from the repository.
         </div>
-      )}
 
-      {report === null && error === null && !loading && <p style={{ color: 'var(--fg-subtle)' }}>Loading report…</p>}
+        {error !== null && (
+          <div className="err" role="alert" style={{ marginTop: 'var(--s4)' }}>
+            <strong>Report unavailable.</strong> <span className="mono wrap-any">{error}</span>{' '}
+            <button type="button" className="btn btn--small" onClick={() => void load()}>Retry</button>
+          </div>
+        )}
+        {loading && error === null && (
+          <p className="note" style={{ marginTop: 'var(--s5)' }} role="status">Loading report…</p>
+        )}
 
-      {report !== null && (
-        <>
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginTop: 20 }}>
-            <div className="card" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-                <span style={{ color: 'var(--ok)' }}>{report.summary.passed} / {report.summary.total}</span>
-                <span style={{ color: 'var(--fg-subtle)', fontSize: '1rem', fontWeight: 500 }}> security scenarios passed</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+        {report !== null && (
+          <>
+            <section className="card" style={{ marginTop: 'var(--s5)' }} aria-labelledby="sum-h">
+              <h2 className="card-title" id="sum-h">Summary</h2>
+              <p style={{ marginTop: 'var(--s2)' }}>
+                <strong className="num" style={{ fontSize: '2rem', color: report.summary.failed === 0 ? 'var(--ok)' : 'var(--deny)' }}>
+                  {report.summary.passed} / {report.summary.total}
+                </strong>{' '}
+                scenarios passed
+              </p>
+              <div className="chips">
                 <span className="badge badge--neutral">{report.summary.attacks} attacks</span>
                 <span className="badge badge--neutral">{report.summary.failureDemos} failure demos</span>
-                <span className="badge badge--neutral">baseline {report.baselineCommit}</span>
+                <span className="badge badge--neutral" title="The commit the suite was first baselined at — not the deployed build.">suite first baselined at {report.baselineCommit}</span>
               </div>
-            </div>
-            {Object.entries(report.summary.byCategory).map(([cat, bucket]) => (
-              <div key={cat} className="card" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '1.1rem', fontWeight: 700, color: bucket.passed === bucket.total ? 'var(--ok)' : 'var(--deny)' }}>
-                  {bucket.passed}/{bucket.total}
+              <div className="grid-auto" style={{ marginTop: 'var(--s4)', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 150px), 1fr))' }}>
+                {Object.entries(report.summary.byCategory).map(([cat, b]) => (
+                  <div key={cat} className="card tight">
+                    <div className="num" style={{ fontWeight: 700, color: b.passed === b.total ? 'var(--ok)' : 'var(--deny)' }}>
+                      {b.passed}/{b.total}
+                    </div>
+                    <div className="note">{cat.replaceAll('_', ' ').toLowerCase()}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="section" aria-labelledby="show-h" style={{ paddingTop: 'var(--s6)' }}>
+              <h2 className="card-title" id="show-h" style={{ marginBottom: 'var(--s3)' }}>Showcase scenarios</h2>
+              <div className="stack">
+                {SHOWCASE.map((id) => {
+                  const sc = scenarios.find((x) => x.id === id);
+                  return sc ? <ScenarioCard key={id} sc={sc} open={open === id} onToggle={() => setOpen((cur) => (cur === id ? null : id))} /> : null;
+                })}
+              </div>
+            </section>
+
+            <section className="section" aria-labelledby="all-h" style={{ paddingTop: 'var(--s6)' }}>
+              <h2 className="card-title" id="all-h" style={{ marginBottom: 'var(--s3)' }}>All {report.summary.total} scenarios</h2>
+              <details className="card disclose">
+                <summary>Expand the full scenario list</summary>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Layer</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Observed</th>
+                        <th scope="col">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scenarios.map((sc) => (
+                        <tr key={sc.id}>
+                          <td className="mono" style={{ whiteSpace: 'nowrap' }}>{sc.id}</td>
+                          <td>{sc.category.replaceAll('_', ' ').toLowerCase()}</td>
+                          <td>{sc.title}</td>
+                          <td className="mono wrap-any" title={sc.observed.outcome}>{truncate(sc.observed.outcome, 80)}</td>
+                          <td><span className={`badge badge--${sc.status === 'PASS' ? 'ok' : 'deny'}`}>{sc.status}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div style={{ color: 'var(--fg-subtle)', fontSize: '.8rem', marginTop: 2 }}>{cat.replaceAll('_', ' ')}</div>
-              </div>
-            ))}
-          </section>
+              </details>
+            </section>
+          </>
+        )}
 
-          <section style={{ marginTop: 24 }}>
-            <h2 style={{ fontSize: '.85rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--fg-subtle)' }}>
-              Showcase scenarios
-            </h2>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {SHOWCASE.map((id) => {
-                const sc = scenarios.find((x) => x.id === id);
-                return sc ? <ScenarioCard key={id} sc={sc} open={open === id} onToggle={() => setOpen((cur) => (cur === id ? null : id))} /> : null;
-              })}
-            </div>
-          </section>
-
-          <section style={{ marginTop: 24 }}>
-            <h2 style={{ fontSize: '.85rem', textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--fg-subtle)' }}>
-              All {report.summary.total} scenarios
-            </h2>
-            <details className="card" open={false}>
-              <summary style={{ cursor: 'pointer' }}>Expand full scenario list</summary>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12, fontSize: '.82rem' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--fg-subtle)' }}>
-                    <th style={{ padding: '4px 8px' }}>ID</th>
-                    <th style={{ padding: '4px 8px' }}>Layer</th>
-                    <th style={{ padding: '4px 8px' }}>Title</th>
-                    <th style={{ padding: '4px 8px' }}>Observed</th>
-                    <th style={{ padding: '4px 8px' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scenarios.map((sc) => (
-                    <tr key={sc.id} style={{ borderTop: '1px solid var(--border)' }}>
-                      <td style={{ padding: '6px 8px' }} className="mono">{sc.id}</td>
-                      <td style={{ padding: '6px 8px' }}>{sc.category.replaceAll('_', ' ')}</td>
-                      <td style={{ padding: '6px 8px' }}>{sc.title}</td>
-                      <td style={{ padding: '6px 8px' }} className="mono" title={sc.observed.outcome}>{truncate(sc.observed.outcome, 80)}</td>
-                      <td style={{ padding: '6px 8px' }}>
-                        <span className={`badge badge--${sc.status === 'PASS' ? 'ok' : 'deny'}`}>{sc.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          </section>
-
-          <p style={{ color: 'var(--fg-subtle)', fontSize: '.8rem', marginTop: 24 }}>
-            This page is a read model over the deterministic suite; it adds no trust logic and no scores.
-            Regenerate from source with <code className="mono">pnpm demo:attacks</code>.
-          </p>
-        </>
-      )}
-    </main>
+        <footer className="footer">
+          <p>This page is a read model over a deterministic suite; it adds no trust logic and no scores.</p>
+        </footer>
+      </main>
+    </div>
   );
 }
 
@@ -157,60 +162,54 @@ function truncate(s: string, n: number): string {
 function ScenarioCard(props: { sc: AttackScenarioDto; open: boolean; onToggle: () => void }) {
   const { sc } = props;
   const passed = sc.status === 'PASS';
+  const panel = `panel-${sc.id}`;
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <button
-        onClick={props.onToggle}
-        aria-expanded={props.open}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '24px 140px 1fr auto',
-          gap: 12,
-          width: '100%',
-          padding: '12px 16px',
-          background: props.open ? 'var(--surface-raised)' : 'transparent',
-          border: 'none',
-          color: 'var(--fg)',
-          textAlign: 'left',
-          alignItems: 'center',
-        }}
-      >
-        <span aria-hidden style={{ color: passed ? 'var(--ok)' : 'var(--deny)', fontWeight: 700 }}>{passed ? '✓' : '✕'}</span>
-        <span className="mono">{sc.id}</span>
-        <span style={{ fontSize: '.9rem' }}>{sc.title}</span>
-        <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? 'blocked' : 'FAIL'}</span>
-      </button>
+    <article className="card tight" style={{ padding: 0, overflow: 'hidden' }}>
+      <h3 style={{ margin: 0, fontSize: '1rem' }}>
+        <button
+          type="button"
+          className="btn"
+          onClick={props.onToggle}
+          aria-expanded={props.open}
+          aria-controls={panel}
+          style={{ width: '100%', justifyContent: 'flex-start', gap: 'var(--s3)', border: 0, borderRadius: 0, background: props.open ? 'var(--surface-2)' : 'transparent', textAlign: 'left', flexWrap: 'wrap' }}
+        >
+          <span aria-hidden style={{ color: passed ? 'var(--ok)' : 'var(--deny)', fontWeight: 800 }}>{passed ? '✓' : '✕'}</span>
+          <span className="mono">{sc.id}</span>
+          <span style={{ flex: '1 1 220px', fontWeight: 520 }}>{sc.title}</span>
+          <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? 'blocked' : 'FAIL'}</span>
+        </button>
+      </h3>
       {props.open && (
-        <div style={{ padding: '0 16px 14px', borderTop: '1px solid var(--border)', margin: '0 16px 0', paddingTop: 10 }}>
-          <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: '180px 1fr', gap: '4px 16px', fontSize: '.85rem' }}>
-            <dt style={{ color: 'var(--fg-subtle)' }}>Expected</dt>
-            <dd style={{ margin: 0 }}>{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
-            <dt style={{ color: 'var(--fg-subtle)' }}>Observed</dt>
-            <dd style={{ margin: 0 }} className="mono">{sc.observed.outcome}</dd>
+        <div id={panel} style={{ padding: 'var(--s4)', borderTop: '1px solid var(--border)' }}>
+          <dl className="kv">
+            <dt>Expected</dt>
+            <dd>{sc.expected.outcome}{sc.expected.reasonCode ? ` (${sc.expected.reasonCode})` : ''}</dd>
+            <dt>Observed</dt>
+            <dd className="mono wrap-any">{sc.observed.outcome}</dd>
             {sc.observed.reasonCodes.length > 0 && (
               <>
-                <dt style={{ color: 'var(--fg-subtle)' }}>Reason codes</dt>
-                <dd style={{ margin: 0 }} className="mono">{sc.observed.reasonCodes.join(', ')}</dd>
+                <dt>Reason codes</dt>
+                <dd className="mono wrap-any">{sc.observed.reasonCodes.join(', ')}</dd>
               </>
             )}
-            <dt style={{ color: 'var(--fg-subtle)' }}>Invariants</dt>
-            <dd style={{ margin: 0 }} className="mono">{formatInvariants(sc.observed.invariants)}</dd>
+            <dt>Invariants</dt>
+            <dd className="mono wrap-any">{formatInvariants(sc.observed.invariants)}</dd>
             {sc.detail !== undefined && (
               <>
-                <dt style={{ color: 'var(--fg-subtle)' }}>Failure detail</dt>
-                <dd style={{ margin: 0 }} className="mono">{sc.detail}</dd>
+                <dt>Failure detail</dt>
+                <dd className="mono wrap-any">{sc.detail}</dd>
               </>
             )}
           </dl>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
 function formatInvariants(inv: Record<string, unknown>): string {
-  return Object.entries(inv).map(([k, v]) => {
-    if (typeof v === 'object' && v !== null) return `${k}=${JSON.stringify(v)}`;
-    return `${k}=${String(v)}`;
-  }).join(' · ');
+  return Object.entries(inv)
+    .map(([k, v]) => (typeof v === 'object' && v !== null ? `${k}=${JSON.stringify(v)}` : `${k}=${String(v)}`))
+    .join(' · ');
 }

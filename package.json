@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Trust & Authorization Fabric for AI agents \u2014 monorepo root",
+  "description": "Trust & Authorization Fabric for AI agents — monorepo root",
   "packageManager": "pnpm@11.1.1",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -26,7 +26,9 @@
     "demo:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs",
     "test:attacks": "tsx packages/attacks/scripts/demo-attacks.mjs --ci",
     "smoke:live": "node scripts/smoke-live.mjs",
-    "shots:live": "node scripts/shots-live.mjs"
+    "shots:live": "node scripts/shots-live.mjs",
+    "ui:shots": "node scripts/ui-shots.mjs",
+    "ui:check": "node scripts/ui-check.mjs"
   },
   "devDependencies": {
     "@agent-trust/audit": "workspace:*",
