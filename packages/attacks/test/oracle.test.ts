@@ -167,6 +167,14 @@ describe('strict evidence comparison (no JSON-encoding collisions)', () => {
     expect(strictEqual(() => 0, () => 0)).toBe(false);
   });
 
+  it('rejects a sparse array posing as a dense one (holes are not skipped)', () => {
+    const sparse = new Array(2); // two holes
+    expect(strictEqual(sparse, [undefined, undefined])).toBe(false);
+    expect(strictEqual([1, , 3], [1, 2, 3])).toBe(false); // eslint-disable-line no-sparse-arrays
+    expect(strictEqual([1, 2, 3], [1, , 3])).toBe(false); // eslint-disable-line no-sparse-arrays
+    expect(requireInvariants({ ...good, invariants: { r: new Array(1) } }, { r: [undefined] }).ok).toBe(false);
+  });
+
   it('an EMPTY expectation fails instead of passing vacuously', () => {
     expect(requireInvariants(obs({}), {}).ok).toBe(false);
     expect(requireInvariants(obs({ executorCalls: 0 }), {}).ok).toBe(false);

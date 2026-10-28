@@ -54,7 +54,7 @@ A mutation sweep proves these specific defences are exercised; it is not a proof
 
 ## Verification record (this branch)
 
-Typecheck clean; 652 unit/property tests pass (51 files, including 132 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
+Typecheck clean; 653 unit/property tests pass (51 files, including 133 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
 
 ## Independent audit and its resolution
 
@@ -69,4 +69,6 @@ A fresh read-only audit (Codex GPT-6.1 Sol) of the first two commits found six a
 | P2 `requireInvariants` compared JSON text; empty combinators passed | Structural strict equality (rejects `toJSON`, `NaN`, `undefined`, class instances); empty expectation and `allOf()` fail; a throwing checker is a FAIL | unit tests |
 | P2 per-scenario mutation test too weak | Evidence is a declarative table; **every asserted key** is independently deleted and corrupted and must be rejected; a recorded key that is neither asserted nor listed informational fails | registry test |
 
-Two mutants remain subsumed rather than killed (see above), and Codex agreed they are redundant under current contracts. Codex also confirmed that no trust-consuming path relies on checkpoint comparison alone.
+A second Codex pass over the fixes failed to complete ("selected model is at capacity", a platform error; not retried unchanged). Before failing it reported one real bug, a sparse array passing `strictEqual` without its holes being compared; that is fixed and tested. The six fixes above were verified by re-running each original negative control as a real product mutant, not by that second report. A fresh independent pass over the final diff is still worth doing.
+
+Two mutants remain subsumed rather than killed (see above), and the first Codex pass agreed they are redundant under current contracts. Codex also confirmed that no trust-consuming path relies on checkpoint comparison alone.

@@ -42,7 +42,11 @@ export function strictEqual(a: unknown, b: unknown): boolean {
   if (ta !== 'object') return false;
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((v, i) => strictEqual(v, b[i]));
+    for (let i = 0; i < a.length; i++) {
+      // A sparse array's holes are skipped by every()/forEach(); compare by index and require both sides to have the slot.
+      if (!(i in a) || !(i in b) || !strictEqual(a[i], b[i])) return false;
+    }
+    return true;
   }
   const plain = (o: object) => { const p = Object.getPrototypeOf(o); return p === Object.prototype || p === null; };
   if (!plain(a as object) || !plain(b as object)) return false;
