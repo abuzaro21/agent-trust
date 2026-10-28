@@ -54,7 +54,7 @@ A mutation sweep proves these specific defences are exercised; it is not a proof
 
 ## Verification record (this branch)
 
-Typecheck clean; 658 unit/property tests pass (51 files, including 138 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
+Typecheck clean; 662 unit/property tests pass (51 files, including 142 `packages/attacks` tests: oracle negative controls, registry integrity, per-key evidence mutation, socket-pinning, regression tests for each weakness above); 60/60 scenarios; Redis integration 5/5 against a disposable container; OPA `fmt`/`check`/`test` clean (13/13); `policy.wasm` SHA-256 equals the committed manifest (`c0248310…eea8`, unchanged). No gateway, crypto, replay, policy, audit, Rego or Wasm file was modified.
 
 ## Independent audit and its resolution
 
@@ -80,7 +80,22 @@ Verdict: **CHANGES REQUIRED** — two P2 findings, no P0/P1, no change to any pr
 
 | Finding | Fix |
 |---|---|
-| P2 `strictEqual` accepted malformed arrays: prototype-supplied elements, a custom `toJSON` (which serialises as different evidence), `Array` subclasses | Evidence must be plain JSON-like data: exact `Array`/`Object` prototype, own enumerable data properties only (no accessors, symbols or non-index extras), every array index an own element. Negative controls run through `judge` and the real `AUDIT-009` checker. |
+| P2 `strictEqual` accepted malformed arrays: prototype-supplied elements, a custom `toJSON` (which serialises as different evidence), `Array` subclasses | Evidence must be plain JSON-like data (see the sign-off round below for the final form). Negative controls run through `judge` and the real `AUDIT-009` checker. |
 | P2 quarantine survivors were described as redundant, but removing the late stage lets a quarantined subject verify when `expectedSubject` is omitted | `STATUS-003` now reaches each verifier quarantine stage independently (plus a pre-quarantine control); both single-stage mutants are killed. The documentation no longer calls them redundant. |
 
 Follow-ups from the same audit: the stale statement that `POLICY-002` and `STATUS-004` assert no invariant was removed from `docs/submission/final-submission.md`, and the verifier's kid/issuer comparison, which the audit found redundant only under today's resolvers, is now pinned by `CREDENTIAL-002`. The audit did not certify the author-reported mutation tally, because the mutation scripts are not in the repository; the figures above come from the author's runs and from the audit's independent reproduction of the specific controls it listed. These fixes have not been re-audited by Codex.
+
+## Final sign-off round (read-only, against `e102fee`)
+
+The sign-off audit again returned **CHANGES REQUIRED**: the two earlier P2 repairs were verified (quarantine stages and the kid/issuer binding were each re-mutated at runtime and fail for the intended reason), but it reproduced two further ways for *live objects* to pose as evidence. Both were fixed:
+
+| Finding | Fix |
+|---|---|
+| P2 an enumerable **getter** in the invariants container (genuine on the first read, forged afterwards) passed the real `AUDIT-009` checker | Evidence is read through own-property **data descriptors** only, and the container must itself be plain data. `judge()` additionally validates the whole observation and judges an inert deep **snapshot**, so nothing can change between validation and use. |
+| P2 a **Proxy**-backed array answered reflection, reads and `toJSON` differently | Proxies are rejected (`util.types.isProxy`) at every level, including the invariants container, nested values and `reasonCodes`; cyclic or absurdly deep structures also fail. Both reproductions run as negative controls through the real `AUDIT-009` checker and `judge()`, and were confirmed to pass against the previous oracle. |
+
+Also corrected: the `/attacks` pass badge said "blocked" for every scenario, which overstates containment and failure demonstrations; it now shows the typed outcome class (`denied`, `refused`, `detected`, `contained`, `failed safe`).
+
+Scope of the one surviving mutant: the delegation walker's "parent has no remaining depth" branch is subsumed by the child-depth comparison for every **schema-valid** depth (non-negative integers). The exported walker performs no schema validation of its own, so direct calls with malformed depths (negative, `NaN`, `undefined`) can distinguish the two; that input domain is rejected earlier by credential-schema validation at the gateway and is not covered by this suite. The guard should stay in the runtime.
+
+What the audits did and did not certify: mutation results for the specific controls named above were reproduced independently; the aggregate sweep tally is author-reported (the scripts are deliberately not in the repository). The sandboxed audit could not run Redis integration, the production build or the browser check; those were run by the author on the exact final source (see below) and have not been independently reproduced. A Codex pass over the final repairs of this round is still outstanding.

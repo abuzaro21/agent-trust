@@ -208,6 +208,64 @@ describe('strict evidence comparison (no JSON-encoding collisions)', () => {
     expect(judge(sc, r.observed, INVARIANT_CHECKS['AUDIT-009']).status).toBe('PASS');
   });
 
+  describe('live-object evidence (getters, Proxies) cannot masquerade as data — through the REAL AUDIT-009 checker and judge()', () => {
+    const real = async () => {
+      const { ATTACK_REGISTRY, INVARIANT_CHECKS, runAttackSuite } = await import('../src/index.js');
+      const r = (await runAttackSuite({ only: ['AUDIT-009'] })).scenarios[0]!;
+      return { r, sc: ATTACK_REGISTRY.find((x) => x.id === 'AUDIT-009')!, check: INVARIANT_CHECKS['AUDIT-009']! };
+    };
+
+    it('an enumerable GETTER inside the invariants container (genuine on the first read, forged afterwards) FAILS', async () => {
+      const { r, sc, check } = await real();
+      let reads = 0;
+      const inv: Record<string, unknown> = { ...r.observed.invariants };
+      Object.defineProperty(inv, 'wrongSignerReasons', { enumerable: true, get: () => (++reads === 1 ? ['AUDIT_SIGNER_UNTRUSTED'] : ['ACCEPTED']) });
+      const forged = { ...r.observed, invariants: inv };
+      expect(check(forged).ok).toBe(false); // direct checker call
+      expect(judge(sc, forged, check).status).toBe('FAIL'); // and through judge()
+      expect(judge(sc, r.observed, check).status).toBe('PASS'); // control: the genuine observation still passes
+    });
+
+    it('a Proxy-backed array (reflection says ACCEPTED, reads say the expected value, toJSON says ACCEPTED) FAILS', async () => {
+      const { r, sc, check } = await real();
+      const proxied = new Proxy(['ACCEPTED'], {
+        get(target, key, receiver) {
+          if (key === '0') return 'AUDIT_SIGNER_UNTRUSTED';
+          if (key === 'toJSON') return () => ['ACCEPTED'];
+          return Reflect.get(target, key, receiver);
+        },
+      });
+      expect(strictEqual(proxied, ['AUDIT_SIGNER_UNTRUSTED'])).toBe(false);
+      const forged = { ...r.observed, invariants: { ...r.observed.invariants, wrongSignerReasons: proxied } };
+      expect(check(forged).ok).toBe(false);
+      expect(judge(sc, forged, check).status).toBe('FAIL');
+    });
+
+    it('a Proxy as the invariants container, as a nested value, or as reasonCodes FAILS; so does a getter on reasonCodes', async () => {
+      const { r, sc, check } = await real();
+      const proxyContainer = { ...r.observed, invariants: new Proxy({ ...r.observed.invariants }, {}) };
+      expect(check(proxyContainer).ok).toBe(false);
+      expect(judge(sc, proxyContainer, check).status).toBe('FAIL');
+      const nested = { ...r.observed, invariants: { ...r.observed.invariants, wrongSignerReasons: [new Proxy({}, {})] } };
+      expect(judge(sc, nested as never, check).status).toBe('FAIL');
+      const proxyReasons = { ...r.observed, reasonCodes: new Proxy([...r.observed.reasonCodes], {}) };
+      expect(judge(sc, proxyReasons, check).status).toBe('FAIL');
+      const getterReasons = { ...r.observed };
+      Object.defineProperty(getterReasons, 'reasonCodes', { enumerable: true, get: () => r.observed.reasonCodes });
+      expect(judge(sc, getterReasons, check).status).toBe('FAIL');
+    });
+
+    it('a cyclic or absurdly deep structure FAILS instead of hanging or overflowing the stack', async () => {
+      const { r, sc, check } = await real();
+      const cyclic: Record<string, unknown> = {};
+      cyclic.self = cyclic;
+      expect(judge(sc, { ...r.observed, invariants: { ...r.observed.invariants, extra: cyclic } }, check).status).toBe('FAIL');
+      let deep: unknown = 'x';
+      for (let i = 0; i < 50; i++) deep = [deep];
+      expect(judge(sc, { ...r.observed, invariants: { ...r.observed.invariants, extra: deep } }, check).status).toBe('FAIL');
+    });
+  });
+
   it('an EMPTY expectation fails instead of passing vacuously', () => {
     expect(requireInvariants(obs({}), {}).ok).toBe(false);
     expect(requireInvariants(obs({ executorCalls: 0 }), {}).ok).toBe(false);

@@ -1,3 +1,5 @@
+import { types } from 'node:util';
+
 import type { AttackObserved, AttackScenario } from './types.js';
 
 /**
@@ -58,6 +60,8 @@ export function strictEqual(a: unknown, b: unknown): boolean {
  * index present as an OWN element (a hole filled by the prototype chain does not count).
  */
 function isPlainData(o: object): boolean {
+  // A Proxy can answer reflection (descriptors, prototype) and later reads differently: never trust one.
+  if (types.isProxy(o)) return false;
   const proto = Object.getPrototypeOf(o);
   if (Array.isArray(o)) {
     if (proto !== Array.prototype) return false;
@@ -79,6 +83,49 @@ function isPlainData(o: object): boolean {
   });
 }
 
+/**
+ * Read one recorded invariant WITHOUT invoking user code: the container must be plain data, and the key an own
+ * enumerable DATA property (an accessor could return different values on each read; a Proxy trap could lie).
+ */
+function readEvidence(o: AttackObserved, key: string): { ok: true; value: unknown } | { ok: false; detail: string } {
+  const inv = o.invariants as unknown;
+  if (typeof inv !== 'object' || inv === null || !isPlainData(inv)) return { ok: false, detail: 'invariants container is not plain data' };
+  const d = Object.getOwnPropertyDescriptor(inv, key);
+  if (d === undefined) return { ok: false, detail: `${key} was not recorded` };
+  if (!('value' in d) || d.enumerable !== true) return { ok: false, detail: `${key} is not an own enumerable data property` };
+  return { ok: true, value: d.value };
+}
+
+export type Snapshot = { ok: true; value: unknown } | { ok: false; detail: string };
+
+/**
+ * Deep, one-pass snapshot of an observation into inert plain data. Rejects Proxies, accessors, symbols, class
+ * instances, non-finite numbers, undefined, functions, cycles and absurd depth; reads only descriptors, so no user
+ * code runs and nothing can change between validation and use. The oracle judges the SNAPSHOT.
+ */
+export function snapshotEvidence(v: unknown, path = '$', seen: object[] = []): Snapshot {
+  if (v === null || typeof v === 'string' || typeof v === 'boolean') return { ok: true, value: v };
+  if (typeof v === 'number') return Number.isFinite(v) ? { ok: true, value: v } : { ok: false, detail: `${path} is a non-finite number` };
+  if (typeof v !== 'object') return { ok: false, detail: `${path} has unsupported type ${typeof v}` };
+  if (!isPlainData(v)) return { ok: false, detail: `${path} is not plain data (proxy, accessor, symbol, custom prototype or extra property)` };
+  if (seen.includes(v)) return { ok: false, detail: `${path} is cyclic` };
+  if (seen.length > 24) return { ok: false, detail: `${path} is nested too deeply` };
+  seen.push(v);
+  try {
+    const out: Inv | unknown[] = Array.isArray(v) ? [] : {};
+    const keys = Array.isArray(v) ? v.map((_, i) => String(i)) : Object.keys(v);
+    for (const k of keys) {
+      const d = Object.getOwnPropertyDescriptor(v, k)!;
+      const child = snapshotEvidence(d.value, `${path}.${k}`, seen);
+      if (!child.ok) return child;
+      Object.defineProperty(out, k, { value: child.value, enumerable: true, writable: true, configurable: true });
+    }
+    return { ok: true, value: out };
+  } finally {
+    seen.pop();
+  }
+}
+
 /** Defence in depth ONLY (human text). The typed verdict is the oracle. */
 const FAILURE_MARKER = /UNDETECTED|UNEXPECTED|UNUSUAL|STALE KEY SURVIVED|connected \(unexpected\)/i;
 
@@ -88,14 +135,14 @@ const FAILURE_MARKER = /UNDETECTED|UNEXPECTED|UNUSUAL|STALE KEY SURVIVED|connect
  * observation that forgot to record an invariant cannot satisfy the check.
  */
 export function requireInvariants(o: AttackObserved, expected: Record<string, unknown>): InvariantVerdict {
-  const inv = o.invariants as Inv;
   const problems: string[] = [];
   if (Object.keys(expected).length === 0) problems.push('no expectations declared (an empty check would pass vacuously)');
   for (const [key, want] of Object.entries(expected)) {
-    if (!hasOwn(inv, key)) problems.push(`${key} was not recorded`);
-    else if (!strictEqual(inv[key], want)) problems.push(`${key}=${safe(inv[key])}, required ${safe(want)}`);
+    const got = readEvidence(o, key);
+    if (!got.ok) problems.push(got.detail);
+    else if (!strictEqual(got.value, want)) problems.push(`${key}=${safe(got.value)}, required ${safe(want)}`);
   }
-  return problems.length === 0 ? { ok: true } : { ok: false, detail: `${problems.join('; ')} (observed: ${JSON.stringify(inv)})` };
+  return problems.length === 0 ? { ok: true } : { ok: false, detail: `${problems.join('; ')} (observed: ${safe(o.invariants)})` };
 }
 
 const safe = (v: unknown): string => {
@@ -104,18 +151,18 @@ const safe = (v: unknown): string => {
 
 /** Strict numeric lower bound; a missing or non-numeric key fails. */
 export function requireAtLeast(o: AttackObserved, key: string, min: number): InvariantVerdict {
-  const inv = o.invariants as Inv;
-  const v = inv[key];
-  return hasOwn(inv, key) && typeof v === 'number' && Number.isFinite(v) && v >= min
-    ? { ok: true }
-    : { ok: false, detail: `${key}=${JSON.stringify(v)}, required >= ${min}` };
+  const got = readEvidence(o, key);
+  if (!got.ok) return { ok: false, detail: got.detail };
+  const v = got.value;
+  return typeof v === 'number' && Number.isFinite(v) && v >= min ? { ok: true } : { ok: false, detail: `${key}=${safe(v)}, required >= ${min}` };
 }
 
 /** A recorded string that must be present and non-empty (a typed cause marker, not free text to match). */
 export function requireNonEmptyString(o: AttackObserved, key: string): InvariantVerdict {
-  const inv = o.invariants as Inv;
-  const v = inv[key];
-  return hasOwn(inv, key) && typeof v === 'string' && v.length > 0 ? { ok: true } : { ok: false, detail: `${key} must be a non-empty string, got ${safe(v)}` };
+  const got = readEvidence(o, key);
+  if (!got.ok) return { ok: false, detail: got.detail };
+  const v = got.value;
+  return typeof v === 'string' && v.length > 0 ? { ok: true } : { ok: false, detail: `${key} must be a non-empty string, got ${safe(v)}` };
 }
 
 /** Combine several verdicts: all must hold. An empty combination FAILS (it would pass vacuously). */
@@ -125,8 +172,12 @@ export function allOf(...parts: InvariantVerdict[]): InvariantVerdict {
   return bad.length === 0 ? { ok: true } : { ok: false, detail: bad.map((b) => b.detail ?? 'failed').join(' | ') };
 }
 
-export function judge(sc: AttackScenario, observed: AttackObserved, check: InvariantCheck | undefined): Judgement {
+export function judge(sc: AttackScenario, rawObserved: AttackObserved, check: InvariantCheck | undefined): Judgement {
   const failures: string[] = [];
+  // Judge an inert, validated snapshot — never live objects that could change (or answer differently) between reads.
+  const snap = snapshotEvidence(rawObserved);
+  if (!snap.ok) return { status: 'FAIL', failures: [`observation is not plain JSON-like data: ${snap.detail}`] };
+  const observed = snap.value as AttackObserved;
   const e = sc.expected;
 
   // 1. well-formed declaration

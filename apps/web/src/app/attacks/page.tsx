@@ -170,7 +170,7 @@ function ScenarioCard(props: { sc: AttackScenarioDto; open: boolean; onToggle: (
           <span aria-hidden style={{ color: passed ? 'var(--ok)' : 'var(--deny)', fontWeight: 800 }}>{passed ? '✓' : '✕'}</span>
           <span className="mono">{sc.id}</span>
           <span style={{ flex: '1 1 220px', fontWeight: 520 }}>{sc.title}</span>
-          <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? 'blocked' : 'FAIL'}</span>
+          <span className={`badge badge--${passed ? 'ok' : 'deny'}`}>{passed ? (sc.observed.verdict ?? 'passed').toLowerCase().replace('_', ' ') : 'FAIL'}</span>
         </button>
       </h3>
       {props.open && (
