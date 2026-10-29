@@ -1,6 +1,6 @@
 # Submission readiness — The Agent That Earns Trust
 
-**Status (2026-10-28): NOT SUBMITTED.** The release is deployed and verified; the DOO form has not been opened for submission, no form field has been filled, and nothing has been uploaded. This page records the verified release metadata, the current official requirements (with sources), and what still has to happen. It is documentation only.
+**Status (2026-10-29): NOT SUBMITTED.** The release is deployed and was re-verified on 2026-10-29 (author-run: `/api/health` build `f004ae8`, `identityMode web`; `/api/demo/status` `replayStore redis`; `smoke:live` 45/45; public DID documents resolve with public keys only; rendered `/attacks` shows the stored 60/60 report with its build-time notice). The 90-second video is complete (see section 4). The DOO form has not been submitted and no form field has been filled. This page records the verified release metadata, the current official requirements (with sources), and what still has to happen. It is documentation only.
 
 ## 1. Verified release
 
@@ -34,7 +34,7 @@ Primary source (signed-in view, including the submit form; the submit button was
 | 5 | Failure demonstration | Deliverable: a malicious or spoofed agent tries to act and trust catches it. No dedicated form field. Scoring: *Failure thinking* (15) — concrete, defended attack scenario. | challenge page: Deliverables, scoring table |
 | 6 | Two-year thesis | **≤ 300 words** on agent identity and reputation. No dedicated form field. Repo thesis: 293 words (296 with the title). | challenge page: Deliverables |
 | 7 | Release tag | **Not mentioned anywhere on the page — not required.** No tag has been created. | challenge page (no tag, release or version requirement) |
-| 8 | Other fields / evidence | The form has four fields: repo URL, live demo URL (required), Loom/video (optional), and notes (what to look at, AI usage, decisions). Disqualifiers: a reputation score with no mechanism; no demo of a trust-gated decision. Bonus signals: DIDs/VCs standards; cross-agent demo. A Builders League account is required. Notes length limit and any hidden validation: **UNVERIFIED**. | challenge page |
+| 8 | Other fields / evidence | The form has four fields: repo URL, live demo URL (required), Loom/video (optional), and notes (what to look at, AI usage, decisions). Disqualifiers: a reputation score with no mechanism; no demo of a trust-gated decision. Bonus signals: DIDs/VCs standards; cross-agent demo. A Builders League account is required. **Notes limit: 2,000 characters** (the notes field's `maxlength`, read 2026-10-29; the URL fields have no client-side length or pattern limit). Any server-side validation: **UNVERIFIED**. | challenge page (re-read 2026-10-29: fields, checklist and "17d 8h left" countdown unchanged) |
 
 **Discrepancies observed (not errors on our side):**
 
@@ -59,18 +59,18 @@ Primary source (signed-in view, including the submit form; the submit button was
 
 ## 4. Video status
 
-Not recorded. Optional per the official checklist and form (section 2, row 2). A pre-production plan exists outside the repository (`E:\doo\agent-trust-video-preproduction`), with a 90.0 s timeline and narration; production has **not** been authorized or started. The submit form accepts an optional URL, so skipping the video is permitted; recording one is recommended because the rubric scores whether the decision is "visible and explainable in 90s".
+**Complete (2026-10-29).** The 90-second film (release candidate RC3) was approved by the author: https://youtu.be/z4uGR81ybV4. It shows real footage of the public demo (build `f004ae8`, captured 2026-10-28) and labelled explanatory motion graphics, with **AI-generated narration (Chatterbox TTS)**; the refund execution shown is simulated. Record, transcript, disclosures and file hashes: [video.md](video.md). The video field on the form is optional; this URL goes there.
 
 ## 5. Remaining blockers and tasks
 
 Blockers (must be done by the owner before the deadline; none can be done by documentation):
 
-1. **Submit the entry** through the signed-in form on the challenge page (not done). Fields: repo URL, live demo URL, optional video URL, notes.
+1. **Submit the entry** through the signed-in form on the challenge page (not done). Fields: repo URL, live demo URL, video URL (https://youtu.be/z4uGR81ybV4), notes (≤ 2,000 characters).
 2. **Re-verify the public URL immediately before submitting** (free-plan sleep; demo state resets on restart): `/api/health` build `f004ae8`, `/api/demo/status`, `corepack pnpm smoke:live` with `DEMO_PUBLIC_URL=https://agent-trust.onrender.com` → 45/45.
 
 Open decisions / non-blocking:
 
-3. Decide whether to record the optional 90-second video (needs a separate production approval).
+3. ~~Decide whether to record the optional 90-second video~~ — done: the film is complete (section 4).
 4. Confirm the deadline timezone if it matters (UNVERIFIED); until then treat Nov 15 as ending no later than the start of Nov 15 in the earliest timezone you care about, and submit early.
 5. The `DEMO_BUILD_SHA` environment variable on Render is stale and ignored by the app (it prefers Render's own commit metadata); removing it is optional hygiene and was not done.
 6. Deferred, non-blocking: an allocation limit for the attack-suite evidence snapshot (documented in [../security-assurance.md](../security-assurance.md)).

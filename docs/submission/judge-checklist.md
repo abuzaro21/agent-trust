@@ -19,7 +19,7 @@ Nothing vague; every row is clickable or runnable.
 | **Accept / refuse a task** (trust-gated interaction; spoof failure case) | Trust Gateway: one authorized path; deterministic OPA Wasm ALLOW/DENY with machine reason codes; LLM never decides permissions. Real order: identity → replay claim → credentials & status → delegation chain → policy → decision receipt → execution (simulated) → outcome receipt | `packages/gateway/src/gateway.ts` · `policies/agent-trust/decision.rego` · dashboard `/#demo`, `/#failures` |
 | **Live demo (HTTPS URL) — REQUIRED** | **https://agent-trust.onrender.com — live, running `f004ae8` (deploy `dep-dbh4jf8n74is73bjpeb0`), verified 2026-10-28** (`/api/health` build `f004ae8`, `identityMode web`, `replayStore redis`, `smoke:live` 45/45; author-run). Free plan: first request after idle can take about a minute; re-verify just before submitting. One-command local equivalent: `docker compose -f docker-compose.demo.yml up --build` → http://localhost:3000 | README Quickstart |
 | **Public repository** | github.com/abuzaro21/agent-trust (MIT, CI on every push) | GitHub |
-| **90-second walkthrough — OPTIONAL, recommended** | Narration is 167 tokens ≈ 67 s of speech (`loom-script.md`); not recorded yet (needs the public URL — not recorded against localhost pretending to be public); the challenge page states no take or editing rule for the video | `docs/submission/loom-script.md` |
+| **90-second walkthrough — OPTIONAL, recommended** | **Complete** (approved 2026-10-29): https://youtu.be/z4uGR81ybV4 — 90.000 s; real footage of the public demo (build `f004ae8`) and labelled motion graphics; 120 SAR authorized, 5,000 SAR refused in full, spoof / revoked / replay stopped; **AI-generated narration (Chatterbox TTS)**; English captions; simulated execution stated | `docs/submission/video.md` |
 | **Architecture snapshot** | One-screen diagram, this package | `docs/submission/architecture.md` |
 | **Failure thinking / negative tests** | 60/60 scenario suite (52 attacks + 8 failure demos); each judged on a typed expected outcome and machine-checked invariants (a missing checker, verdict or invariant fails), 49 also on a specific reason code and 11 with a written reason for none; hardened by product-mutation testing — see `docs/security-assurance.md`; served at `/attacks`; CI gate `pnpm test:attacks` | `packages/attacks/` |
 | **Two-year thesis** | 293 words (296 with the title); the ≤300-word limit is stated on the challenge page (checked 2026-10-28) | `docs/submission/two-year-thesis.md` |
@@ -34,7 +34,7 @@ Nothing vague; every row is clickable or runnable.
 |---|---|
 | **Conceptual clarity (25)** | README first screen (120-vs-5000 table + the single sentence) · canonical demo run in the live UI · `docs/trust-model.md` |
 | **Technical depth (25)** | 662 tests in the default run (577 package + 85 apps/web; OPA on PATH needed for the native-parity cases) + 5 Redis integration tests · SSRF-pinned did:web transport · PoP→replay→VC→status→attenuation→Wasm→receipts pipeline · ADRs |
-| **Demo quality (20)** | One decision stage: AcmeOrg grants SupportAgent ≤ 500 SAR (read from the backend), two request buttons, a server-authoritative verdict with Authorization and Execution (simulated) as separate facts, and a side-by-side comparison built from the two real responses; spoof / revoked / replay failure cards (three more behind a disclosure); pipeline, receipts, audit history, attestations and the 60/60 report behind disclosures; light default + dark theme; 17 screenshots from real clicks (desktop, tablet, mobile, both themes); responsive at 1920/1440/768/390 px with 78 automated browser checks; optional video script (once recorded on the public URL) |
+| **Demo quality (20)** | One decision stage: AcmeOrg grants SupportAgent ≤ 500 SAR (read from the backend), two request buttons, a server-authoritative verdict with Authorization and Execution (simulated) as separate facts, and a side-by-side comparison built from the two real responses; spoof / revoked / replay failure cards (three more behind a disclosure); pipeline, receipts, audit history, attestations and the 60/60 report behind disclosures; light default + dark theme; 17 screenshots from real clicks (desktop, tablet, mobile, both themes); responsive at 1920/1440/768/390 px with 78 automated browser checks; the 90-second film of the public demo ([video.md](video.md)) |
 | **Failure thinking (15)** | 60/60 scenario suite (typed outcome + machine-checked invariants each; mutation-tested) · fail-closed at every enforcement boundary (incl. startup config: Redis/did:web misconfig refuses boot; a policy-engine crash denies without a receipt) · documented bugs-caught table |
 | **Future thesis (15)** | `two-year-thesis.md` (portable evidence, provenance-as-contract, agent refusal, standards over scores) + what-the-fabric-doesn't-do honesty |
 
@@ -49,7 +49,8 @@ Nothing vague; every row is clickable or runnable.
 | `smoke:live` 45/45 | PASS on 2026-10-28 against the deployed `f004ae8` (author-run); earlier that day also PASS on `0a3e623` and on the pre-audit build `4c25b4b` (both superseded) |
 | Public `/attacks` page and claim wording (real browser) | PASS 15/15 on `f004ae8` (author-run): corrected headline, typed outcome badges, 60 rows PASS, stored-report verdicts, 49 / 11 reason-code split, no stale wording |
 | Public HTTPS URL (REQUIRED) | **MET** on 2026-10-28 — `f004ae8` deployed and verified; re-verify immediately before submitting |
-| 90-second walkthrough | OPTIONAL but recommended — not recorded; not a submission blocker |
+| `smoke:live` 45/45 (re-run) | PASS on 2026-10-29 against the deployed `f004ae8` (author-run, 15:45Z) |
+| 90-second walkthrough | **Complete** — approved by the author 2026-10-29 (RC3); https://youtu.be/z4uGR81ybV4; record in video.md |
 | Challenge requirements and judging weights | READ DIRECTLY 2026-10-28 from https://build.doo.ooo/challenges/agent-earns-trust (signed-in view, including the submit-form fields); see submission-readiness.md. The deadline's timezone is not stated (UNVERIFIED) |
 | Video take/edit rules | None stated on the challenge page |
 | Screenshots | Regenerated from the current UI with real clicks (`pnpm shots:live`); they must be regenerated again if the UI changes |
@@ -64,8 +65,8 @@ Remaining before submission (full list: submission-readiness.md):
   1. Re-verify the public URL immediately before submitting: /api/health build.sha, /api/demo/status
      (identityMode=web, replayStore=redis), DEMO_PUBLIC_URL=https://agent-trust.onrender.com corepack pnpm smoke:live -> 45/45.
      The free plan sleeps after ~15 min idle (about a minute to wake) and demo state resets on restart.
-  2. Optional: record the 90-second walkthrough from the public URL (see loom-script.md and the pre-production plan).
-  3. Fill the DOO form by hand (repo URL, live demo URL, optional video URL, notes) before the deadline.
+  2. Done: the 90-second film is complete (video.md); its URL goes in the video field.
+  3. Fill the DOO form by hand (repo URL, live demo URL, video URL, notes ≤ 2,000 characters) before the deadline.
      No release tag is required by the challenge page; the auto-deploy stays off.
 ```
 
