@@ -2,8 +2,8 @@
 
 **Status (2026-10-29): complete and approved by the author (release candidate RC3).**
 
-- **Watch:** VIDEO_URL_PENDING (YouTube, unlisted: anyone with the link can watch, no sign-in needed)
-- **Verified:** VIDEO_VERIFIED_PENDING
+- **Watch:** https://youtu.be/z4uGR81ybV4 (YouTube, unlisted: anyone with the link can watch, no sign-in needed)
+- **Verified:** 2026-10-29, without signing in (oEmbed and the public watch page): playable, unlisted, 90 s (1080p30 stream 89.999 s), 1080p available, uploaded English caption track listed, embedding allowed, description links correct
 
 This is a documentation record. The film is not stored in this repository, and the application was not changed or redeployed to make it.
 

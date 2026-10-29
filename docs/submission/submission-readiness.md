@@ -59,13 +59,13 @@ Primary source (signed-in view, including the submit form; the submit button was
 
 ## 4. Video status
 
-**Complete (2026-10-29).** The 90-second film (release candidate RC3) was approved by the author: VIDEO_URL_PENDING. It shows real footage of the public demo (build `f004ae8`, captured 2026-10-28) and labelled explanatory motion graphics, with **AI-generated narration (Chatterbox TTS)**; the refund execution shown is simulated. Record, transcript, disclosures and file hashes: [video.md](video.md). The video field on the form is optional; this URL goes there.
+**Complete (2026-10-29).** The 90-second film (release candidate RC3) was approved by the author: https://youtu.be/z4uGR81ybV4. It shows real footage of the public demo (build `f004ae8`, captured 2026-10-28) and labelled explanatory motion graphics, with **AI-generated narration (Chatterbox TTS)**; the refund execution shown is simulated. Record, transcript, disclosures and file hashes: [video.md](video.md). The video field on the form is optional; this URL goes there.
 
 ## 5. Remaining blockers and tasks
 
 Blockers (must be done by the owner before the deadline; none can be done by documentation):
 
-1. **Submit the entry** through the signed-in form on the challenge page (not done). Fields: repo URL, live demo URL, video URL (VIDEO_URL_PENDING), notes (≤ 2,000 characters).
+1. **Submit the entry** through the signed-in form on the challenge page (not done). Fields: repo URL, live demo URL, video URL (https://youtu.be/z4uGR81ybV4), notes (≤ 2,000 characters).
 2. **Re-verify the public URL immediately before submitting** (free-plan sleep; demo state resets on restart): `/api/health` build `f004ae8`, `/api/demo/status`, `corepack pnpm smoke:live` with `DEMO_PUBLIC_URL=https://agent-trust.onrender.com` → 45/45.
 
 Open decisions / non-blocking:

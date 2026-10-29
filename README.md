@@ -7,7 +7,7 @@
 > **Live demo (required deliverable):** https://agent-trust.onrender.com
 > **Status (2026-10-28): live and verified.** The public service runs commit `f004ae8` (the merge of PR #3: the hardened attack-suite assurance, on top of the PR #1 security fixes and the PR #2 judge UI), deployed on 2026-10-28 as Render deploy `dep-dbh4jf8n74is73bjpeb0` and verified the same day by the author: `/api/health` reports `build.sha f004ae8`, `identityMode web`; `/api/demo/status` reports `replayStore redis`; `pnpm smoke:live` passed 45/45; a real-click browser check of the public site passed 15/15 and a separate check of the public `/attacks` page and claim wording passed 15/15. GitHub CI on `main` at `f004ae8` is green ([run 40750984910](https://github.com/abuzaro21/agent-trust/actions/runs/40750984910)). The free plan sleeps after about 15 minutes idle, so the first request can take about a minute. Details: [docs/deployment.md](docs/deployment.md). You can also run the demo locally with the quickstart below.
 > **The refund executor is a simulation — no money moves.**
-> **90-second video:** VIDEO_URL_PENDING — a walkthrough of the canonical run (120 SAR authorized, 5,000 SAR refused in full, spoof / revoked / replay stopped): real footage of the public demo (build `f004ae8`) plus labelled explanatory motion graphics, with **AI-generated narration (Chatterbox TTS)**. Record and disclosures: [docs/submission/video.md](docs/submission/video.md).
+> **90-second video:** https://youtu.be/z4uGR81ybV4 — a walkthrough of the canonical run (120 SAR authorized, 5,000 SAR refused in full, spoof / revoked / replay stopped): real footage of the public demo (build `f004ae8`) plus labelled explanatory motion graphics, with **AI-generated narration (Chatterbox TTS)**. Record and disclosures: [docs/submission/video.md](docs/submission/video.md).
 
 ### Quickstart (local, ~3 minutes on first build)
 
@@ -49,7 +49,7 @@ Prerequisites: Docker with Compose v2, internet access to pull base images, and 
 
 ### For judges
 
-[Submission package](docs/submission/final-submission.md) (form data, thesis, status) · [Judge checklist](docs/submission/judge-checklist.md) (requirement → evidence) · [Two-year thesis](docs/submission/two-year-thesis.md) · [AI tools & decisions](docs/submission/ai-tools-and-decisions.md) · [Out of scope](docs/submission/out-of-scope.md) · [90-second video](docs/submission/video.md) (VIDEO_URL_PENDING; AI narration disclosed) · [Threat model](docs/threat-model.md)
+[Submission package](docs/submission/final-submission.md) (form data, thesis, status) · [Judge checklist](docs/submission/judge-checklist.md) (requirement → evidence) · [Two-year thesis](docs/submission/two-year-thesis.md) · [AI tools & decisions](docs/submission/ai-tools-and-decisions.md) · [Out of scope](docs/submission/out-of-scope.md) · [90-second video](docs/submission/video.md) (https://youtu.be/z4uGR81ybV4; AI narration disclosed) · [Threat model](docs/threat-model.md)
 
 **Same legitimate agent. Same identity. Same verified credential.**
 
