@@ -51,6 +51,24 @@ reviewers disagreed in places (documented, not forced into agreement).
 Not fixed (listed in the threat model): status-list rollback, `perDay`
 enforcement, DID key-purpose checks, multi-hop through the gateway.
 
+## The 90-second video (October 2026)
+
+The submission film ([video.md](video.md)) was made with AI tools, disclosed here and in the video description:
+
+- **Claude (Anthropic), through Claude Code**, produced the film under the author's direction:
+  - the edit and motion graphics, in Remotion (React and TypeScript);
+  - the narration pipeline;
+  - the original synthesized music and sound effects;
+  - the quality checks.
+- **Chatterbox TTS** (Resemble AI, MIT licence), run locally with its built-in voice, generated **all narration**. There is no voice cloning, and Resemble's imperceptible Perth watermark is kept in the audio.
+- **Whisper** small.en (OpenAI) transcribed every narration line to check its accuracy. It is not part of the film.
+- **OpenAI Codex (GPT-6.1 Sol), read-only,** independently critiqued the film. It checked the narrated claims against the capture logs, measured the audio, and confirmed that the evidence frames were unchanged across the timing revisions.
+- No generative image or video model was used. The application footage is a real screen recording of the public demo, and the explanatory graphics are labelled ILLUSTRATION on screen.
+
+Verification caught AI mistakes here too:
+- A caption drafted as "Accepted once. Refused twice." was false and was corrected to "Accepted once. Re-send refused."
+- An earlier mix passed every loudness and transcription check, yet the author heard a hiss in it. The causes were traced (a synthetic noise bed, the voice model's breathy aspiration, and limiter clicks) and fixed at their source.
+
 ## Major engineering decisions
 
 - **did:web for P0 identities, did:key only for test fixtures.** did:web

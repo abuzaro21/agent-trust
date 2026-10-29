@@ -2,7 +2,7 @@
 
 ## Status
 
-**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`), the judge-facing UI by PR #2 (merge commit `0a3e623`) and the hardened attack-suite assurance by PR #3 (regular merge commit `f004ae818cdbba9f8183d35f2147d318a73d1a42`, tree `50b2c85e…`; GitHub CI green, [run 40750984910](https://github.com/abuzaro21/agent-trust/actions/runs/40750984910)). The public Render service https://agent-trust.onrender.com was suspended for security containment, redeployed from `0a3e623`, and then updated to `f004ae8` (deploy `dep-dbh4jf8n74is73bjpeb0`, no suspend or restart) and verified the same day by the author (`smoke:live` 45/45; real-click UI check 15/15; `/attacks` and claim-wording check 15/15; `identityMode web`, `replayStore redis`; auto-deploy off). The 90-second video is optional but recommended and is not recorded yet. Nothing has been submitted to the DOO form. Re-verify the public URL immediately before submitting (free-plan sleep, state resets on restart). The current requirement check and the remaining blockers are in [submission-readiness.md](submission-readiness.md).
+**Status (2026-10-28).** The security fixes were merged by PR #1 (merge commit `e4ba7eb`), the judge-facing UI by PR #2 (merge commit `0a3e623`) and the hardened attack-suite assurance by PR #3 (regular merge commit `f004ae818cdbba9f8183d35f2147d318a73d1a42`, tree `50b2c85e…`; GitHub CI green, [run 40750984910](https://github.com/abuzaro21/agent-trust/actions/runs/40750984910)). The public Render service https://agent-trust.onrender.com was suspended for security containment, redeployed from `0a3e623`, and then updated to `f004ae8` (deploy `dep-dbh4jf8n74is73bjpeb0`, no suspend or restart) and verified the same day by the author (`smoke:live` 45/45; real-click UI check 15/15; `/attacks` and claim-wording check 15/15; `identityMode web`, `replayStore redis`; auto-deploy off). **Update 2026-10-29:** the 90-second video is complete and approved by the author (RC3): VIDEO_URL_PENDING — real footage of the public demo plus labelled motion graphics, with AI-generated narration (Chatterbox TTS); record and disclosures in [video.md](video.md). The live deployment was re-verified on 2026-10-29 (`/api/health` build `f004ae8`, `identityMode web`, `replayStore redis`, `smoke:live` 45/45, author-run). Nothing has been submitted to the DOO form. Re-verify the public URL immediately before submitting (free-plan sleep, state resets on restart). The current requirement check and the remaining blockers are in [submission-readiness.md](submission-readiness.md).
 
 **Release baseline.** The original submission freeze (`c286ebd`) predates an independent audit. The post-audit repairs were merged by PR #1 into `main` as merge commit `e4ba7eb` (tree-identical to the tested branch head `92ff923`), the single-stage judge UI by PR #2 (`0a3e623`), and the attack-suite assurance hardening by PR #3 (`f004ae8`, tree-identical to the audited head `2f554ee`). The submitted commit is the one the running build reports at `/api/health` (`RENDER_GIT_COMMIT`): currently `f004ae8`. The challenge page does not require a release tag (checked 2026-10-28), so none has been created.
 
@@ -31,7 +31,8 @@ Live Demo URL:       https://agent-trust.onrender.com (REQUIRED — live, runnin
                       adds real did:web identities, see docs/deployment.md.
                       The public did:web identities below resolve RIGHT NOW)
 
-Walkthrough URL:     OPTIONAL but recommended — not recorded yet (script ready: loom-script.md)
+Walkthrough URL:     VIDEO_URL_PENDING (90 s, YouTube unlisted; AI narration
+                     disclosed — see video.md)
 
 Architecture summary: Identity → Claims → Verification → Authority →
                       Policy → Provenance. Every request from an agent
@@ -156,7 +157,8 @@ The attack-suite assurance work (PR #3) had its own independent read-only Codex 
 ## Files in this package
 
 - `final-submission.md` (this summary)
-- `loom-script.md` (90-second narration, 167 tokens ≈ 67 s of speech)
+- `video.md` (the final 90-second film: link, what it shows, AI narration and production disclosures, file hashes)
+- `loom-script.md` (the original walkthrough script; the final film's narration was rewritten for the produced edit — see video.md)
 - `two-year-thesis.md`
 - `architecture.md` (one-screen snapshot)
 - `ai-tools-and-decisions.md`

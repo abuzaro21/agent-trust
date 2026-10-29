@@ -1,5 +1,7 @@
 # 90-Second Walkthrough Script
 
+> **Superseded (2026-10-29):** the final 90-second film was produced with its own narration; see [video.md](video.md) for the film, its transcript and disclosures. This script is kept as the pre-production draft.
+
 The challenge lists the 90-second video as **optional but recommended**; the live demo URL is the required part. This script targets the single-stage UI: one decision stage (grant strip, two request buttons "120 SAR" / "5,000 SAR", verdict), a side-by-side comparison, then three failure cards. Light theme is the default.
 
 **Target: 85–90 seconds.** The narration below is **167 tokens**

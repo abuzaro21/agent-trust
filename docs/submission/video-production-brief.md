@@ -1,8 +1,11 @@
-# Video Production Brief (handoff — not yet executed)
+# Video Production Brief (historical planning document)
 
-Status: **planning only.** Nothing here has been recorded or rendered. Execution
-is gated on a validated public demo (see "Preconditions"). The challenge lists the
-90-second video as **optional but recommended**; the live demo URL is the required deliverable.
+Status: **superseded (2026-10-29).** The 90-second film was produced and approved; see
+[video.md](video.md). Production differed from this plan: it was built in Remotion (not Hyperframes),
+the narration is Chatterbox TTS (not Kokoro), it has an original synthesized score and sound design (no
+licensed tracks), and no 20-second promo cut was made. This page is kept
+as the original plan. The challenge lists the 90-second video as **optional but recommended**; the live
+demo URL is the required deliverable.
 
 Two deliverables, produced by one pipeline:
 
